@@ -16,6 +16,7 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin></script>
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
@@ -49,6 +50,32 @@
     textarea:focus, input:focus, button:focus-visible, select:focus-visible {
       outline: 3px solid var(--lamplight);
       outline-offset: 2px;
+    }
+
+    /* Calm, slowly-drifting pastel background used while answering questions. */
+    @keyframes cibDrift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .cib-drift-bg {
+      background-image: linear-gradient(120deg, #EAF2EC 0%, #F6F0E6 25%, #F3E6E9 50%, #E7EEF4 75%, #EAF2EC 100%);
+      background-size: 320% 320%;
+      animation: cibDrift 50s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cib-drift-bg { animation: none; background-position: 0% 50%; }
+    }
+
+    /* Small pulsing dot: a quiet, peripheral cue that a new question has loaded. */
+    @keyframes cibPulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(217,154,43,0.5); }
+      100% { box-shadow: 0 0 0 8px rgba(217,154,43,0); }
+    }
+    .cib-new-question-cue {
+      animation: cibPulseRing 900ms ease-out;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cib-new-question-cue { animation: none; }
     }
   </style>
 
@@ -480,6 +507,52 @@
       return "q" + Date.now().toString(36) + Math.floor(Math.random() * 1000);
     }
 
+    // ─── Shared PDF export: renders the same plain-text summary used by
+    // "Copy answers" into a paginated, downloadable PDF. ───
+    function exportTextToPDF(filename, headingTitle, bodyText) {
+      const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+      if (!jsPDFCtor) {
+        window.alert("PDF export isn't available right now. Please check your connection and try again.");
+        return;
+      }
+      const doc = new jsPDFCtor({ unit: "pt", format: "letter" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 54;
+      const maxWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(31, 58, 52);
+      doc.splitTextToSize(headingTitle, maxWidth).forEach((line) => {
+        doc.text(line, margin, y);
+        y += 20;
+      });
+      y += 8;
+
+      doc.setFont("courier", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(34, 49, 44);
+      const lineHeight = 13;
+
+      bodyText.split("\n").forEach((rawLine) => {
+        const isHeading = rawLine.length > 0 && !/^\s/.test(rawLine) && !/^\d/.test(rawLine) && rawLine === rawLine.trim() && rawLine.length < 60 && !rawLine.includes(":");
+        const wrapped = doc.splitTextToSize(rawLine.length ? rawLine : " ", maxWidth);
+        wrapped.forEach((line) => {
+          if (y + lineHeight > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.setFont("courier", isHeading ? "bold" : "normal");
+          doc.text(line, margin, y);
+          y += lineHeight;
+        });
+      });
+
+      doc.save(filename);
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Component 1: PSI-4-SF Response Recorder
     // ─────────────────────────────────────────────────────────────
@@ -697,6 +770,15 @@
         setTimeout(() => setCopied(false), 2000);
       };
 
+      const exportPDF = () => {
+        const slug = (form.title || "assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        exportTextToPDF(
+          slug + "-" + new Date().toISOString().slice(0, 10) + ".pdf",
+          form.title + (form.subtitle ? " — " + form.subtitle : ""),
+          summaryText()
+        );
+      };
+
       const Eyebrow = ({ children, dark }) => (
         <div
           className="cib-body text-xs font-bold uppercase tracking-widest mb-2"
@@ -895,23 +977,27 @@
       if (mode === "fill" && current) {
         const progress = ((idx + 1) / askable.length) * 100;
         const value = answers[current.id];
+        const canAdvance = value !== undefined && value !== null && !(typeof value === "string" && value.trim().length === 0);
         return (
-          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+          <div className="cib-body cib-drift-bg min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ color: "var(--ink)" }}>
             <style>{FONT_CSS_PSI}</style>
             <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
               <div className="mb-8">
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                  <span className="text-sm" style={{ color: "var(--ink-soft)" }}>{form.title}</span>
+                  <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--ink-soft)" }}>
+                    <span key={current.id} className="cib-new-question-cue inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--lamplight-deep)" }} />
+                    {idx + 1} of {askable.length}
+                  </span>
                 </div>
-                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(34,49,44,0.10)" }}>
                   <div className="h-1 rounded-full" style={{ width: progress + "%", background: "var(--lamplight)", transition: "width 300ms ease" }} />
                 </div>
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow dark>{current.category}</Eyebrow> : null}
-                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
 
@@ -926,7 +1012,7 @@
                           className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
                           style={selected
                             ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
-                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                            : { background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }
                           }
                         >
                           {label}
@@ -945,7 +1031,7 @@
                           className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
                           style={selected
                             ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
-                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                            : { background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }
                           }
                         >
                           {choice.label}
@@ -961,18 +1047,34 @@
                     rows={5}
                     aria-label="Your answer"
                     className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
-                    style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                    style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}
                   />
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
-                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
-                  Back
-                </button>
-                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
-                  {idx + 1 >= askable.length ? "Finish" : "Next"}
-                </button>
+              <div className="mt-8">
+                {!canAdvance && (
+                  <p className="text-sm mb-3 text-center" style={{ color: "var(--ink-soft)" }}>
+                    Select a response to continue.
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-black/5" style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}>
+                    Back
+                  </button>
+                  <button
+                    onClick={next}
+                    disabled={!canAdvance}
+                    aria-disabled={!canAdvance}
+                    className="flex-1 rounded-2xl py-4 text-base font-bold transition-all"
+                    style={canAdvance
+                      ? { background: "var(--spruce)", color: "var(--cream-on-dark)" }
+                      : { background: "rgba(34,49,44,0.10)", color: "rgba(34,49,44,0.35)", cursor: "not-allowed" }
+                    }
+                  >
+                    {idx + 1 >= askable.length ? "Finish" : "Next"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1036,9 +1138,14 @@
               })}
             </div>
 
-            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
-              {copied ? "Copied" : "Copy answers"}
-            </button>
+            <div className="flex gap-3 mb-3">
+              <button onClick={copySummary} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                {copied ? "Copied" : "Copy answers"}
+              </button>
+              <button onClick={exportPDF} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--lamplight-deep)", color: "var(--spruce-deep)" }}>
+                Export PDF
+              </button>
+            </div>
             <div className="flex gap-3">
               <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
                 New check-in
@@ -1287,6 +1394,15 @@
         setTimeout(() => setCopied(false), 2000);
       };
 
+      const exportPDF = () => {
+        const slug = (form.title || "assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        exportTextToPDF(
+          slug + "-" + new Date().toISOString().slice(0, 10) + ".pdf",
+          form.title + (form.subtitle ? " — " + form.subtitle : ""),
+          summaryText()
+        );
+      };
+
       const Eyebrow = ({ children, dark }) => (
         <div className="cib-body text-xs font-bold uppercase tracking-widest mb-2" style={{ color: dark ? "var(--soft-on-dark)" : "var(--moss)", letterSpacing: "0.14em" }}>
           {children}
@@ -1482,17 +1598,21 @@
       if (mode === "fill" && current) {
         const progress = ((idx + 1) / askable.length) * 100;
         const value = answers[current.id];
+        const canAdvance = value !== undefined && value !== null && !(typeof value === "string" && value.trim().length === 0);
         const isSocial = ["Social Cooperation", "Social Interaction", "Social Independence"].includes(current.category);
         return (
-          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+          <div className="cib-body cib-drift-bg min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ color: "var(--ink)" }}>
             <style>{FONT_CSS_PKBS}</style>
             <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
               <div className="mb-8">
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                  <span className="text-sm" style={{ color: "var(--ink-soft)" }}>{form.title}</span>
+                  <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--ink-soft)" }}>
+                    <span key={current.id} className="cib-new-question-cue inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--lamplight-deep)" }} />
+                    {idx + 1} of {askable.length}
+                  </span>
                 </div>
-                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(34,49,44,0.10)" }}>
                   <div className="h-1 rounded-full" style={{ width: progress + "%", background: isSocial ? "var(--moss)" : "var(--lamplight)", transition: "width 300ms ease" }} />
                 </div>
               </div>
@@ -1501,7 +1621,7 @@
                 {current.category ? (
                   <Eyebrow dark>{current.category}</Eyebrow>
                 ) : null}
-                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
 
@@ -1516,7 +1636,7 @@
                           className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
                           style={selected
                             ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
-                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                            : { background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }
                           }
                         >
                           <span className="inline-block w-6 text-center mr-2 opacity-60">{i + (form.scaleStart || 0)}</span>
@@ -1533,18 +1653,34 @@
                     rows={5}
                     aria-label="Your answer"
                     className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
-                    style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                    style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}
                   />
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
-                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
-                  Back
-                </button>
-                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
-                  {idx + 1 >= askable.length ? "Finish" : "Next"}
-                </button>
+              <div className="mt-8">
+                {!canAdvance && (
+                  <p className="text-sm mb-3 text-center" style={{ color: "var(--ink-soft)" }}>
+                    Select a response to continue.
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-black/5" style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}>
+                    Back
+                  </button>
+                  <button
+                    onClick={next}
+                    disabled={!canAdvance}
+                    aria-disabled={!canAdvance}
+                    className="flex-1 rounded-2xl py-4 text-base font-bold transition-all"
+                    style={canAdvance
+                      ? { background: "var(--spruce)", color: "var(--cream-on-dark)" }
+                      : { background: "rgba(34,49,44,0.10)", color: "rgba(34,49,44,0.35)", cursor: "not-allowed" }
+                    }
+                  >
+                    {idx + 1 >= askable.length ? "Finish" : "Next"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1612,9 +1748,14 @@
               })}
             </div>
 
-            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
-              {copied ? "Copied" : "Copy answers"}
-            </button>
+            <div className="flex gap-3 mb-3">
+              <button onClick={copySummary} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                {copied ? "Copied" : "Copy answers"}
+              </button>
+              <button onClick={exportPDF} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--lamplight-deep)", color: "var(--spruce-deep)" }}>
+                Export PDF
+              </button>
+            </div>
             <div className="flex gap-3">
               <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
                 New check-in
@@ -1797,6 +1938,15 @@
         setTimeout(() => setCopied(false), 2000);
       };
 
+      const exportPDF = () => {
+        const slug = (form.title || "assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        exportTextToPDF(
+          slug + "-" + new Date().toISOString().slice(0, 10) + ".pdf",
+          form.title + (form.subtitle ? " — " + form.subtitle : ""),
+          summaryText()
+        );
+      };
+
       const Eyebrow = ({ children, dark }) => (
         <div className="cib-body text-xs font-bold uppercase tracking-widest mb-2" style={{ color: dark ? "var(--soft-on-dark)" : "var(--alert)", letterSpacing: "0.14em" }}>
           {children}
@@ -1806,11 +1956,11 @@
       // Yes = alert/terracotta; No = spruce; Unsure = muted
       const optionColor = (i, selected) => {
         if (!selected) {
-          return { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" };
+          return { background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" };
         }
         if (i === 0) return { background: "var(--alert)", color: "var(--cream-on-dark)", boxShadow: "0 0 0 3px rgba(180,85,46,0.35)" };
-        if (i === 1) return { background: "var(--cream-on-dark)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(244,239,228,0.35)" };
-        return { background: "var(--soft-on-dark)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(168,187,175,0.35)" };
+        if (i === 1) return { background: "var(--spruce)", color: "var(--cream-on-dark)", boxShadow: "0 0 0 3px rgba(31,58,52,0.25)" };
+        return { background: "var(--moss)", color: "var(--cream-on-dark)", boxShadow: "0 0 0 3px rgba(127,160,140,0.35)" };
       };
 
       // ─── BUILD MODE ───
@@ -1961,23 +2111,27 @@
       if (mode === "fill" && current) {
         const progress = ((idx + 1) / askable.length) * 100;
         const value = answers[current.id];
+        const canAdvance = value !== undefined && value !== null && !(typeof value === "string" && value.trim().length === 0);
         return (
-          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+          <div className="cib-body cib-drift-bg min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ color: "var(--ink)" }}>
             <style>{FONT_CSS_TESI}</style>
             <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
               <div className="mb-8">
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                  <span className="text-sm" style={{ color: "var(--ink-soft)" }}>{form.title}</span>
+                  <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--ink-soft)" }}>
+                    <span key={current.id} className="cib-new-question-cue inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--lamplight-deep)" }} />
+                    {idx + 1} of {askable.length}
+                  </span>
                 </div>
-                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(34,49,44,0.10)" }}>
                   <div className="h-1 rounded-full" style={{ width: progress + "%", background: "var(--alert)", transition: "width 300ms ease" }} />
                 </div>
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow dark>{current.category}</Eyebrow> : null}
-                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
 
@@ -1999,7 +2153,7 @@
 
                 {current.describe && value === 0 && (
                   <div className="mt-5">
-                    <div className="text-sm mb-2" style={{ color: "var(--soft-on-dark)" }}>
+                    <div className="text-sm mb-2" style={{ color: "var(--ink-soft)" }}>
                       {current.describePrompt || "If yes, briefly describe:"}
                     </div>
                     <textarea
@@ -2009,19 +2163,35 @@
                       rows={4}
                       aria-label="Describe"
                       className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
-                      style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                      style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}
                     />
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
-                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
-                  Back
-                </button>
-                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
-                  {idx + 1 >= askable.length ? "Finish" : "Next"}
-                </button>
+              <div className="mt-8">
+                {!canAdvance && (
+                  <p className="text-sm mb-3 text-center" style={{ color: "var(--ink-soft)" }}>
+                    Select a response to continue.
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-black/5" style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}>
+                    Back
+                  </button>
+                  <button
+                    onClick={next}
+                    disabled={!canAdvance}
+                    aria-disabled={!canAdvance}
+                    className="flex-1 rounded-2xl py-4 text-base font-bold transition-all"
+                    style={canAdvance
+                      ? { background: "var(--spruce)", color: "var(--cream-on-dark)" }
+                      : { background: "rgba(34,49,44,0.10)", color: "rgba(34,49,44,0.35)", cursor: "not-allowed" }
+                    }
+                  >
+                    {idx + 1 >= askable.length ? "Finish" : "Next"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2099,9 +2269,14 @@
               })}
             </div>
 
-            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
-              {copied ? "Copied" : "Copy answers"}
-            </button>
+            <div className="flex gap-3 mb-3">
+              <button onClick={copySummary} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                {copied ? "Copied" : "Copy answers"}
+              </button>
+              <button onClick={exportPDF} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--lamplight-deep)", color: "var(--spruce-deep)" }}>
+                Export PDF
+              </button>
+            </div>
             <div className="flex gap-3">
               <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
                 New interview
@@ -2128,6 +2303,7 @@
       const [confirmReset, setConfirmReset] = useState(false);
       const [showDisclaimer, setShowDisclaimer] = useState(true);
       const [useKey, setUseKey] = useState(true); // apply official scoring key / classifications
+      const [showResultsHelp, setShowResultsHelp] = useState(true);
       const [raterInfo, setRaterInfo] = useState({ childName: "", birthDate: "", date: "", completedBy: "", relationship: "", providerName: "", discipline: "" });
       const loadedRef = useRef(false);
 
@@ -2348,6 +2524,15 @@
         setTimeout(() => setCopied(false), 2000);
       };
 
+      const exportPDF = () => {
+        const slug = (form.title || "assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        exportTextToPDF(
+          slug + "-" + new Date().toISOString().slice(0, 10) + ".pdf",
+          form.title + (form.subtitle ? " — " + form.subtitle : ""),
+          summaryText()
+        );
+      };
+
       const Eyebrow = ({ children, dark }) => (
         <div className="cib-body text-xs font-bold uppercase tracking-widest mb-2" style={{ color: dark ? "var(--soft-on-dark)" : "var(--lamplight-deep)", letterSpacing: "0.14em" }}>
           {children}
@@ -2535,23 +2720,27 @@
       if (mode === "fill" && current) {
         const progress = ((idx + 1) / askable.length) * 100;
         const value = answers[current.id];
+        const canAdvance = value !== undefined && value !== null && !(typeof value === "string" && value.trim().length === 0);
         return (
-          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+          <div className="cib-body cib-drift-bg min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ color: "var(--ink)" }}>
             <style>{FONT_CSS_SSP}</style>
             <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
               <div className="mb-8">
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
-                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                  <span className="text-sm" style={{ color: "var(--ink-soft)" }}>{form.title}</span>
+                  <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--ink-soft)" }}>
+                    <span key={current.id} className="cib-new-question-cue inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--lamplight-deep)" }} />
+                    {idx + 1} of {askable.length}
+                  </span>
                 </div>
-                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(34,49,44,0.10)" }}>
                   <div className="h-1 rounded-full" style={{ width: progress + "%", background: "var(--lamplight)", transition: "width 300ms ease" }} />
                 </div>
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow dark>{current.category}</Eyebrow> : null}
-                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
 
@@ -2565,7 +2754,7 @@
                         className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
                         style={selected
                           ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
-                          : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                          : { background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }
                         }
                       >
                         <span className="inline-block w-6 text-center mr-2 opacity-60">{i + (form.scaleStart || 1)}</span>
@@ -2577,8 +2766,8 @@
                     onClick={() => setAnswers({ ...answers, [current.id]: "na" })}
                     className="w-full rounded-2xl py-3 px-5 text-left text-sm font-bold transition-all active:scale-[0.99]"
                     style={value === "na"
-                      ? { background: "var(--soft-on-dark)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(168,187,175,0.35)" }
-                      : { background: "transparent", color: "var(--soft-on-dark)", border: "1px dashed rgba(255,255,255,0.22)" }
+                      ? { background: "var(--moss)", color: "var(--cream-on-dark)", boxShadow: "0 0 0 3px rgba(127,160,140,0.35)" }
+                      : { background: "transparent", color: "var(--ink-soft)", border: "1px dashed rgba(34,49,44,0.25)" }
                     }
                   >
                     X — not observed / doesn't apply
@@ -2586,13 +2775,29 @@
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-8">
-                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
-                  Back
-                </button>
-                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
-                  {idx + 1 >= askable.length ? "Finish" : "Next"}
-                </button>
+              <div className="mt-8">
+                {!canAdvance && (
+                  <p className="text-sm mb-3 text-center" style={{ color: "var(--ink-soft)" }}>
+                    Select a response to continue.
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-black/5" style={{ background: "rgba(34,49,44,0.05)", color: "var(--ink)", border: "1px solid rgba(34,49,44,0.14)" }}>
+                    Back
+                  </button>
+                  <button
+                    onClick={next}
+                    disabled={!canAdvance}
+                    aria-disabled={!canAdvance}
+                    className="flex-1 rounded-2xl py-4 text-base font-bold transition-all"
+                    style={canAdvance
+                      ? { background: "var(--spruce)", color: "var(--cream-on-dark)" }
+                      : { background: "rgba(34,49,44,0.10)", color: "rgba(34,49,44,0.35)", cursor: "not-allowed" }
+                    }
+                  >
+                    {idx + 1 >= askable.length ? "Finish" : "Next"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2612,6 +2817,15 @@
       // Section keys: official order first, then any custom sections
       const officialNames = SSP_SECTIONS.map((s) => s.name);
       const customNames = Object.keys(totals).filter((n) => !officialNames.includes(n));
+      // Sections flagged as Probable or Definite Difference, for a quick-glance summary
+      const flaggedSections = SSP_SECTIONS
+        .map((s) => {
+          const t = totals[s.name];
+          if (!t) return null;
+          const cls = classifySSP(t.sum, s.typicalMin, s.probableMin);
+          return cls === "Typical Performance" ? null : { name: s.name, cls };
+        })
+        .filter(Boolean);
 
       return (
         <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
@@ -2648,6 +2862,65 @@
                 <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: useKey ? "1.5rem" : "0.25rem" }} />
               </button>
             </div>
+
+            {useKey && showResultsHelp && (
+              <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <div className="flex justify-between items-start mb-2">
+                  <Eyebrow>Understanding these results</Eyebrow>
+                  <button onClick={() => setShowResultsHelp(false)} className="text-sm" style={{ color: "var(--ink-soft)" }}>✕</button>
+                </div>
+                <p className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+                  The answer scale is reverse-scored: <strong>Always = 1</strong> … <strong>Never = 5</strong>. That
+                  means a <strong>lower</strong> section total reflects <strong>more</strong> of the sensory-related
+                  behaviors described — not less.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: sspClassColor("Typical Performance"), color: "var(--spruce-deep)" }}>Typical</span>
+                    <span className="text-xs" style={{ color: "var(--ink-soft)" }}>Within the range typically seen in children without disabilities of the same age. No particular concern indicated by this score alone.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: sspClassColor("Probable Difference"), color: "var(--spruce-deep)" }}>Probable</span>
+                    <span className="text-xs" style={{ color: "var(--ink-soft)" }}>A mild-to-moderate difference from same-age peers without disabilities. Worth discussing with a qualified provider and monitoring over time.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: sspClassColor("Definite Difference"), color: "var(--spruce-deep)" }}>Definite</span>
+                    <span className="text-xs" style={{ color: "var(--ink-soft)" }}>A significant difference from same-age peers without disabilities. This typically warrants referral for further evaluation (for example, by an occupational therapist).</span>
+                  </div>
+                </div>
+                <p className="text-xs mt-3" style={{ color: "var(--ink-soft)" }}>
+                  These classifications come from the published norms (n = 1,037 children without
+                  disabilities) and describe this score only — they are not a diagnosis. A qualified
+                  evaluator should interpret results alongside the official manual and other clinical
+                  information.
+                </p>
+              </div>
+            )}
+
+            {useKey && (
+              <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>At a glance</Eyebrow>
+                {flaggedSections.length === 0 ? (
+                  <p className="text-sm" style={{ color: "var(--spruce)" }}>
+                    <strong>All 7 sections</strong> fall within Typical Performance.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm mb-2" style={{ color: "var(--ink)" }}>
+                      <strong>{flaggedSections.length}</strong> of 7 section{flaggedSections.length === 1 ? "" : "s"} {flaggedSections.length === 1 ? "shows" : "show"} a difference from typical performance:
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {flaggedSections.map((f) => (
+                        <div key={f.name} className="flex items-center justify-between">
+                          <span className="text-sm" style={{ color: "var(--ink)" }}>{f.name}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: sspClassColor(f.cls), color: "var(--spruce-deep)" }}>{f.cls}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Section totals */}
             <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
@@ -2735,9 +3008,14 @@
               })}
             </div>
 
-            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
-              {copied ? "Copied" : "Copy answers"}
-            </button>
+            <div className="flex gap-3 mb-3">
+              <button onClick={copySummary} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                {copied ? "Copied" : "Copy answers"}
+              </button>
+              <button onClick={exportPDF} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--lamplight-deep)", color: "var(--spruce-deep)" }}>
+                Export PDF
+              </button>
+            </div>
             <div className="flex gap-3">
               <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
                 New check-in
