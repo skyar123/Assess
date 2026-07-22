@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assessment Recorders</title>
+  <meta name="description" content="Phone-first response recorders and raw score calculators for the Parenting Stress Index (PSI-4-SF), Preschool/Kindergarten Behavior Scales (PKBS-2), and Traumatic Events Screening Inventory (TESI-PRR) clinical instruments.">
+  <link rel="icon" href="images/logo.svg" type="image/svg+xml">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Karla:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- CDN Links for React, ReactDOM, Babel, and Tailwind CSS -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root {
+      --spruce: #1F3A34;
+      --spruce-deep: #162B26;
+      --paper: #F7F4EC;
+      --card: #FFFFFF;
+      --ink: #22312C;
+      --ink-soft: #5C6E66;
+      --lamplight: #F2B653;
+      --lamplight-deep: #D99A2B;
+      --moss: #7FA08C;
+      --mist: #E4E9E2;
+      --cream-on-dark: #F4EFE4;
+      --soft-on-dark: #A8BBAF;
+      --alert: #B4552E;
+      --rose: #9E4A5B;
+      --rose-soft: #C47A89;
+    }
+    .cib-display { font-family: 'Young Serif', Georgia, serif; }
+    .cib-body { font-family: 'Karla', system-ui, sans-serif; }
+    .cib-fade { animation: cibFade 320ms ease both; }
+    @keyframes cibFade {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cib-fade { animation: none; }
+    }
+    textarea:focus, input:focus, button:focus-visible, select:focus-visible {
+      outline: 3px solid var(--lamplight);
+      outline-offset: 2px;
+    }
+  </style>
+
+  <script>
+    // LocalStorage Shim for window.storage to persist state in standard browsers
+    if (!window.storage) {
+      window.storage = {
+        get: async (key) => {
+          try {
+            const value = localStorage.getItem(key);
+            return value ? { value } : null;
+          } catch (e) {
+            console.error("Failed to read from localStorage", e);
+            return null;
+          }
+        },
+        set: async (key, value) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (e) {
+            console.error("Failed to write to localStorage", e);
+          }
+        }
+      };
+    }
+  </script>
+</head>
+<body class="bg-[#F7F4EC]">
+  <div id="root"></div>
+
+  <!-- React Code compiled on-the-fly via Babel -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const FONT_CSS_PSI = `
+    :root {
+      --spruce: #1F3A34;
+      --spruce-deep: #162B26;
+      --paper: #F7F4EC;
+      --card: #FFFFFF;
+      --ink: #22312C;
+      --ink-soft: #5C6E66;
+      --lamplight: #F2B653;
+      --lamplight-deep: #D99A2B;
+      --moss: #7FA08C;
+      --mist: #E4E9E2;
+      --cream-on-dark: #F4EFE4;
+      --soft-on-dark: #A8BBAF;
+      --alert: #B4552E;
+    }
+    `;
+
+    const FONT_CSS_PKBS = `
+    :root {
+      --spruce: #1F3A34;
+      --spruce-deep: #162B26;
+      --paper: #F7F4EC;
+      --card: #FFFFFF;
+      --ink: #22312C;
+      --ink-soft: #5C6E66;
+      --lamplight: #F2B653;
+      --lamplight-deep: #D99A2B;
+      --moss: #7FA08C;
+      --mist: #E4E9E2;
+      --cream-on-dark: #F4EFE4;
+      --soft-on-dark: #A8BBAF;
+      --alert: #B4552E;
+      --rose: #9E4A5B;
+      --rose-soft: #C47A89;
+    }
+    `;
+
+    const FONT_CSS_TESI = `
+    :root {
+      --spruce: #1F3A34;
+      --spruce-deep: #162B26;
+      --paper: #F7F4EC;
+      --card: #FFFFFF;
+      --ink: #22312C;
+      --ink-soft: #5C6E66;
+      --lamplight: #F2B653;
+      --lamplight-deep: #D99A2B;
+      --moss: #7FA08C;
+      --mist: #E4E9E2;
+      --cream-on-dark: #F4EFE4;
+      --soft-on-dark: #A8BBAF;
+      --alert: #B4552E;
+      --rose: #9E4A5B;
+      --rose-soft: #C47A89;
+    }
+    `;
+
+    const STORAGE_KEY_PSI = "psi4sf:responses:v1";
+    const FORM_STORAGE_KEY_PSI = "psi4sf:form:v1";
+
+    const STORAGE_KEY_PKBS = "pkbs2:responses:v1";
+    const FORM_STORAGE_KEY_PKBS = "pkbs2:form:v1";
+
+    const STORAGE_KEY_TESI = "tesiprr:responses:v1";
+    const FORM_STORAGE_KEY_TESI = "tesiprr:form:v1";
+
+    // ─── PSI-4-SF Question Bank ───
+    function psiForm() {
+      return {
+        title: "Parenting Stress Index — Short Form",
+        subtitle: "Response recorder",
+        scale: ["Strongly Agree", "Agree", "Not Sure", "Disagree", "Strongly Disagree"],
+        scaleStart: 1, // SA=5, A=4, NS=3, D=2, SD=1
+        questions: [
+          // ── Parent Distress (PD) ──
+          { id: "i01", text: "I often have the feeling that I cannot handle things very well.", type: "scale", category: "Parent Distress" },
+          { id: "i02", text: "I find myself giving up more of my life to meet my children's needs than I ever expected.", type: "scale", category: "Parent Distress" },
+          { id: "i03", text: "I feel trapped by my responsibilities as a parent.", type: "scale", category: "Parent Distress" },
+          { id: "i04", text: "Since having this child, I have been unable to do new and different things.", type: "scale", category: "Parent Distress" },
+          { id: "i05", text: "Since having a child, I feel that I am almost never able to do things that I like to do.", type: "scale", category: "Parent Distress" },
+          { id: "i06", text: "I am unhappy with the last purchase of clothing I made for myself.", type: "scale", category: "Parent Distress" },
+          { id: "i07", text: "There are quite a few things that bother me about my life.", type: "scale", category: "Parent Distress" },
+          { id: "i08", text: "Having a child has caused more problems than I expected in my relationship with my spouse / parenting partner.", type: "scale", category: "Parent Distress" },
+          { id: "i09", text: "I feel alone and without friends.", type: "scale", category: "Parent Distress" },
+          { id: "i10", text: "When I go to a party, I usually expect not to enjoy myself.", type: "scale", category: "Parent Distress" },
+          { id: "i11", text: "I am not as interested in people as I used to be.", type: "scale", category: "Parent Distress" },
+          { id: "i12", text: "I don't enjoy things as I used to.", type: "scale", category: "Parent Distress" },
+
+          // ── Parent-Child Dysfunctional Interaction (PCDI) ──
+          { id: "i13", text: "My child rarely does things for me that make me feel good.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i14", text: "When I do things for my child, I get the feeling that my efforts are not appreciated very much.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i15", text: "My child smiles at me much less than I expected.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i16", text: "Sometimes I feel my child doesn't like me and doesn't want to be close to me.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i17", text: "My child is very emotional and gets upset easily.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i18", text: "My child doesn't seem to learn as quickly as most children.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i19", text: "My child doesn't seem to smile as much as most children.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i20", text: "My child is not able to do as much as I expected.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i21", text: "It takes a long time and it is very hard for my child to get used to new things.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i22", text: "I feel that I am:", type: "choice", category: "Parent-Child Dysfunctional Interaction",
+            choices: [
+              { label: "a very good parent", score: 1 },
+              { label: "a better-than-average parent", score: 2 },
+              { label: "an average parent", score: 3 },
+              { label: "a person who has some trouble being a parent", score: 4 },
+              { label: "not very good at being a parent", score: 5 },
+            ]
+          },
+          { id: "i23", text: "I expected to have closer and warmer feelings for my child than I do, and this bothers me.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+          { id: "i24", text: "Sometimes my child does things that bother me just to be mean.", type: "scale", category: "Parent-Child Dysfunctional Interaction" },
+
+          // ── Difficult Child (DC) ──
+          { id: "i25", text: "My child seems to cry or fuss more often than most children.", type: "scale", category: "Difficult Child" },
+          { id: "i26", text: "My child generally wakes up in a bad mood.", type: "scale", category: "Difficult Child" },
+          { id: "i27", text: "I feel that my child is very moody and easily upset.", type: "scale", category: "Difficult Child" },
+          { id: "i28", text: "Compared to the average child, my child has a great deal of difficulty in getting used to changes in schedules or changes around the house.", type: "scale", category: "Difficult Child" },
+          { id: "i29", text: "My child reacts very strongly when something happens that my child doesn't like.", type: "scale", category: "Difficult Child" },
+          { id: "i30", text: "When playing, my child doesn't often giggle or laugh.", type: "scale", category: "Difficult Child" },
+          { id: "i31", text: "My child's sleeping or eating schedule was much harder to establish than I expected.", type: "scale", category: "Difficult Child" },
+          { id: "i32", text: "I have found that getting my child to do something or stop doing something is:", type: "choice", category: "Difficult Child",
+            choices: [
+              { label: "much harder than I expected", score: 5 },
+              { label: "somewhat harder than I expected", score: 4 },
+              { label: "about as hard as I expected", score: 3 },
+              { label: "somewhat easier than I expected", score: 2 },
+              { label: "much easier than I expected", score: 1 },
+            ]
+          },
+          { id: "i33", text: "Think carefully and count the number of things which your child does that bothers you. For example: dawdles, refuses to listen, overactive, cries, interrupts, fights, whines, etc.", type: "choice", category: "Difficult Child",
+            choices: [
+              { label: "1 – 3", score: 1 },
+              { label: "4 – 5", score: 2 },
+              { label: "6 – 7", score: 3 },
+              { label: "8 – 9", score: 4 },
+              { label: "10 or more", score: 5 },
+            ]
+          },
+          { id: "i34", text: "There are some things my child does that really bother me a lot.", type: "scale", category: "Difficult Child" },
+          { id: "i35", text: "My child's behavior is more of a problem than I expected.", type: "scale", category: "Difficult Child" },
+          { id: "i36", text: "My child makes more demands on me than most children.", type: "scale", category: "Difficult Child" },
+        ],
+      };
+    }
+
+    // ─── PKBS-2 Question Bank ───
+    function pkbsForm() {
+      return {
+        title: "PKBS-2",
+        subtitle: "Preschool and Kindergarten Behavior Scales — 2nd Edition",
+        scale: ["Never", "Rarely", "Sometimes", "Often"],
+        scaleStart: 0, // Never=0, Rarely=1, Sometimes=2, Often=3
+        questions: [
+          // ═══ Social Skills Scale ═══
+          // ── Social Cooperation (SC) ──
+          { id: "ss01", text: "Works or plays independently", type: "scale", category: "Social Cooperation" },
+          { id: "ss02", text: "Is cooperative", type: "scale", category: "Social Cooperation" },
+          { id: "ss07", text: "Follows instructions from adults", type: "scale", category: "Social Cooperation" },
+          { id: "ss10", text: "Shows self-control", type: "scale", category: "Social Cooperation" },
+          { id: "ss12", text: "Uses free time in an acceptable way", type: "scale", category: "Social Cooperation" },
+          { id: "ss16", text: "Sits and listens when stories are being read", type: "scale", category: "Social Cooperation" },
+          { id: "ss22", text: "Cleans up his or her messes when asked", type: "scale", category: "Social Cooperation" },
+          { id: "ss23", text: "Follows rules", type: "scale", category: "Social Cooperation" },
+          { id: "ss27", text: "Apologizes for accidental behavior that may upset others", type: "scale", category: "Social Cooperation" },
+          { id: "ss28", text: "Gives in or compromises with peers when appropriate", type: "scale", category: "Social Cooperation" },
+          { id: "ss29", text: "Accepts decisions made by adults", type: "scale", category: "Social Cooperation" },
+          { id: "ss30", text: "Takes turns with toys and other objects", type: "scale", category: "Social Cooperation" },
+          { id: "ss32", text: "Responds appropriately when corrected", type: "scale", category: "Social Cooperation" },
+
+          // ── Social Interaction (INT) ──
+          { id: "ss03", text: "Smiles and laughs with other children", type: "scale", category: "Social Interaction" },
+          { id: "ss04", text: "Plays with several different children", type: "scale", category: "Social Interaction" },
+          { id: "ss05", text: 'Tries to understand another child\'s behavior ("Why are you crying?")', type: "scale", category: "Social Interaction" },
+          { id: "ss06", text: "Is accepted and liked by other children", type: "scale", category: "Social Interaction" },
+          { id: "ss09", text: "Makes friends easily", type: "scale", category: "Social Interaction" },
+          { id: "ss11", text: "Is invited by other children to play", type: "scale", category: "Social Interaction" },
+          { id: "ss14", text: "Participates in family or classroom discussions", type: "scale", category: "Social Interaction" },
+          { id: "ss17", text: 'Stands up for other children\'s rights ("That\'s his!")', type: "scale", category: "Social Interaction" },
+          { id: "ss19", text: "Has skills or abilities that are admired by peers", type: "scale", category: "Social Interaction" },
+          { id: "ss20", text: "Comforts other children who are upset", type: "scale", category: "Social Interaction" },
+          { id: "ss21", text: "Invites other children to play", type: "scale", category: "Social Interaction" },
+          { id: "ss25", text: "Shares toys and other belongings", type: "scale", category: "Social Interaction" },
+          { id: "ss33", text: 'Is sensitive to adult problems ("Are you sad?")', type: "scale", category: "Social Interaction" },
+          { id: "ss34", text: "Shows affection for other children", type: "scale", category: "Social Interaction" },
+
+          // ── Social Independence (IND) ──
+          { id: "ss08", text: "Attempts new tasks before asking for help", type: "scale", category: "Social Independence" },
+          { id: "ss13", text: "Is able to separate from parent without extreme distress", type: "scale", category: "Social Independence" },
+          { id: "ss15", text: "Asks for help from adults when needed", type: "scale", category: "Social Independence" },
+          { id: "ss18", text: "Adapts well to different environments", type: "scale", category: "Social Independence" },
+          { id: "ss24", text: "Seeks comfort from an adult when hurt", type: "scale", category: "Social Independence" },
+          { id: "ss26", text: "Stands up for his or her rights", type: "scale", category: "Social Independence" },
+          { id: "ss31", text: "Is confident in social situations", type: "scale", category: "Social Independence" },
+
+          // ═══ Problem Behavior Scale ═══
+          // ── Externalizing Problems (EP) ──
+          { id: "pb01", text: "Acts impulsively without thinking", type: "scale", category: "Externalizing Problems" },
+          { id: "pb03", text: "Teases or makes fun of other children", type: "scale", category: "Externalizing Problems" },
+          { id: "pb06", text: "Makes noises that annoy others", type: "scale", category: "Externalizing Problems" },
+          { id: "pb07", text: "Has temper outbursts or tantrums", type: "scale", category: "Externalizing Problems" },
+          { id: "pb08", text: "Wants all the attention", type: "scale", category: "Externalizing Problems" },
+          { id: "pb10", text: "Will not share", type: "scale", category: "Externalizing Problems" },
+          { id: "pb11", text: "Is physically aggressive (hits, kicks, pushes)", type: "scale", category: "Externalizing Problems" },
+          { id: "pb13", text: "Yells or screams when angry", type: "scale", category: "Externalizing Problems" },
+          { id: "pb14", text: "Takes things away from other children", type: "scale", category: "Externalizing Problems" },
+          { id: "pb15", text: "Has difficulty concentrating or staying on task", type: "scale", category: "Externalizing Problems" },
+          { id: "pb16", text: "Disobeys rules", type: "scale", category: "Externalizing Problems" },
+          { id: "pb19", text: "Must have his or her own way", type: "scale", category: "Externalizing Problems" },
+          { id: "pb20", text: "Is overly active — unable to sit still", type: "scale", category: "Externalizing Problems" },
+          { id: "pb21", text: "Seeks revenge against others", type: "scale", category: "Externalizing Problems" },
+          { id: "pb22", text: "Defies parent, teacher, or caregiver", type: "scale", category: "Externalizing Problems" },
+          { id: "pb25", text: "Is restless and fidgety", type: "scale", category: "Externalizing Problems" },
+          { id: "pb26", text: "Calls people names", type: "scale", category: "Externalizing Problems" },
+          { id: "pb29", text: "Bullies or intimidates other children", type: "scale", category: "Externalizing Problems" },
+          { id: "pb31", text: "Has unpredictable behavior", type: "scale", category: "Externalizing Problems" },
+          { id: "pb32", text: "Is jealous of other children", type: "scale", category: "Externalizing Problems" },
+          { id: "pb34", text: "Destroys things that belong to others", type: "scale", category: "Externalizing Problems" },
+          { id: "pb35", text: "Is moody or temperamental", type: "scale", category: "Externalizing Problems" },
+          { id: "pb37", text: "Whines or complains", type: "scale", category: "Externalizing Problems" },
+          { id: "pb39", text: "Disrupts ongoing activities", type: "scale", category: "Externalizing Problems" },
+          { id: "pb40", text: "Tells lies", type: "scale", category: "Externalizing Problems" },
+          { id: "pb41", text: 'Is easily provoked — has a "short fuse"', type: "scale", category: "Externalizing Problems" },
+          { id: "pb42", text: "Bothers and annoys other children", type: "scale", category: "Externalizing Problems" },
+
+          // ── Internalizing Problems (IP) ──
+          { id: "pb02", text: "Becomes sick when upset or afraid", type: "scale", category: "Internalizing Problems" },
+          { id: "pb04", text: "Does not respond to affection from others", type: "scale", category: "Internalizing Problems" },
+          { id: "pb05", text: "Clings to parent or caregiver", type: "scale", category: "Internalizing Problems" },
+          { id: "pb09", text: "Is anxious or tense", type: "scale", category: "Internalizing Problems" },
+          { id: "pb12", text: "Avoids playing with other children", type: "scale", category: "Internalizing Problems" },
+          { id: "pb17", text: "Has problems making friends", type: "scale", category: "Internalizing Problems" },
+          { id: "pb18", text: "Is afraid or fearful", type: "scale", category: "Internalizing Problems" },
+          { id: "pb23", text: "Complains of aches, pain, or sickness", type: "scale", category: "Internalizing Problems" },
+          { id: "pb24", text: "Resists going to preschool or day care", type: "scale", category: "Internalizing Problems" },
+          { id: "pb27", text: "Is difficult to comfort when upset", type: "scale", category: "Internalizing Problems" },
+          { id: "pb28", text: "Withdraws from the company of others", type: "scale", category: "Internalizing Problems" },
+          { id: "pb30", text: "Seems unhappy or depressed", type: "scale", category: "Internalizing Problems" },
+          { id: "pb33", text: "Acts younger than his or her age", type: "scale", category: "Internalizing Problems" },
+          { id: "pb36", text: "Is overly sensitive to criticism or scolding", type: "scale", category: "Internalizing Problems" },
+          { id: "pb38", text: "Gets taken advantage of by other children", type: "scale", category: "Internalizing Problems" },
+        ],
+      };
+    }
+
+    // ─── TESI-PRR Question Bank ───
+    function tesiForm() {
+      return {
+        title: "TESI-PRR",
+        subtitle: "Traumatic Events Screening Inventory — Parent Report Revised",
+        scale: ["Yes", "No", "Unsure"], // index 0 = Yes (endorsed), 1 = No, 2 = Unsure
+        questions: [
+          { id: "t01", text: "Has your child ever been in a serious accident where someone could have been (or actually was) severely injured or died? (like a serious car or bicycle accident, a fall, a fire, an incident where s/he was burned, an actual or near drowning, or a severe sports injury)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t02", text: "Has your child ever seen a serious accident where someone could have been (or actually was) severely injured or died? (like a serious car or bicycle accident, a fall, a fire, an incident where s/he was burned, an actual or near drowning, or a severe sports injury)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t03", text: "Has your child ever been in a natural disaster where someone could have been (or actually was) severely injured or died, or where your family or people in your community lost or had to permanently leave their home (like a tornado, fire, hurricane, or earthquake)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t04", text: "Has your child ever experienced the severe illness or injury of someone close to him/her?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t05", text: "Has your child ever experienced the death of someone close to him/her?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t06", text: "Has your child ever undergone any serious life-threatening illness? Or been treated by a paramedic, seen in an emergency room, or hospitalized overnight for a medical procedure?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t07", text: "Has your child ever been separated from you or another person who your child depends on for love or security for more than a few days OR under very stressful circumstances? For example, due to foster care, immigration, war, major illness, or hospitalization?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t08", text: "Has someone close to your child ever attempted suicide or harmed him or herself?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t09", text: "Has someone ever physically assaulted your child, like hitting, pushing, choking, shaking, biting, or burning? Or punished your child and caused physical injury or bruises. Or attacked your child with a gun, knife, or other weapon? (This could be done by someone in the family or by someone not in your child's family.)", type: "yesno", category: "Trauma Exposure" },
+          { id: "t10", text: "Has someone ever directly threatened your child with serious physical harm?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t11", text: "Has someone ever mugged or tried to steal from your child? Or has your child been present when a family member, other caregiver, or friend was mugged?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t12", text: "Has anyone ever kidnapped your child? (including a parent or relative) Or has anyone ever kidnapped someone close to your child?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t13", text: "Has your child ever been attacked by a dog or other animal?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t14", text: "Has your child ever seen, heard, or heard about people in your family physically fighting, hitting, slapping, kicking, or pushing each other? Or shooting with a gun or stabbing, or using any other kind of dangerous weapon?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t15", text: "Has your child ever seen or heard people in your family threaten to seriously harm each other?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t16", text: "Has your child ever known or seen that a family member was arrested, jailed, imprisoned, or taken away (like by police, soldiers, or other authorities)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t17", text: "Has your child ever seen or heard people outside your family fighting, hitting, pushing, or attacking each other? Or seen or heard about violence such as beatings, shootings, or muggings that occurred in settings that are important to your child, such as school, your neighborhood, or the neighborhood of someone important to your child?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t18", text: "Has your child ever been directly exposed to war, armed conflict, or terrorism?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t19", text: "Has your child ever seen or heard acts of war or terrorism on the television or radio?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t20", text: "Has someone ever made your child see or do something sexual (like touching in a sexual way, exposing self or masturbating in front of the child, engaging in sexual intercourse)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t21", text: "Has your child ever been present when someone was being forced to engage in any sort of sexual activity?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t22", text: "Has your child ever repeatedly been told s/he was no good, yelled at in a scary way, or had someone threaten to abandon, leave or send him/her away?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t23", text: "Has your child ever gone through a period when s/he lacked appropriate care (like not having enough to eat or drink, lacking shelter, being left alone when s/he was too young to care for herself/himself, or being left with a caregiver who was abusing drugs)?", type: "yesno", category: "Trauma Exposure" },
+          { id: "t24", text: "Have there been other stressful things that have happened to your child?", type: "yesno", category: "Trauma Exposure", describe: true, describePrompt: "If yes, briefly describe these things:" },
+        ],
+      };
+    }
+
+    function newId() {
+      return "q" + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Component 1: PSI-4-SF Response Recorder
+    // ─────────────────────────────────────────────────────────────
+    function PSI4SFRecorder({ onBack }) {
+      const [form, setForm] = useState(psiForm);
+      const [mode, setMode] = useState("build"); // build | fill | done
+      const [answers, setAnswers] = useState({});
+      const [idx, setIdx] = useState(0);
+      const [saveState, setSaveState] = useState("idle");
+      const [copied, setCopied] = useState(false);
+      const [confirmReset, setConfirmReset] = useState(false);
+      const [showDisclaimer, setShowDisclaimer] = useState(true);
+      const loadedRef = useRef(false);
+
+      // Load saved form design if any
+      useEffect(() => {
+        let alive = true;
+        (async () => {
+          try {
+            if (!window.storage) {
+              if (alive) setSaveState("off");
+              loadedRef.current = true;
+              return;
+            }
+            const result = await window.storage.get(FORM_STORAGE_KEY_PSI);
+            if (alive && result && result.value) {
+              const parsed = JSON.parse(result.value);
+              if (parsed && Array.isArray(parsed.questions)) {
+                setForm(parsed);
+              }
+            }
+          } catch (e) {
+            // ignore
+          } finally {
+            loadedRef.current = true;
+          }
+        })();
+        return () => { alive = false; };
+      }, []);
+
+      // Persist form design
+      useEffect(() => {
+        if (!loadedRef.current) return;
+        let cancelled = false;
+        const t = setTimeout(async () => {
+          try {
+            if (!window.storage) return;
+            await window.storage.set(FORM_STORAGE_KEY_PSI, JSON.stringify(form));
+            if (!cancelled) {
+              setSaveState("saved");
+              setTimeout(() => { if (!cancelled) setSaveState("idle"); }, 1500);
+            }
+          } catch (e) {
+            if (!cancelled) setSaveState("off");
+          }
+        }, 600);
+        return () => { cancelled = true; clearTimeout(t); };
+      }, [form]);
+
+      // ─── editing helpers ───
+      const updateQuestion = (id, patch) => {
+        setForm((f) => ({
+          ...f,
+          questions: f.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+        }));
+      };
+      const addQuestion = () => {
+        setForm((f) => ({
+          ...f,
+          questions: [...f.questions, { id: newId(), text: "", type: "scale", category: "" }],
+        }));
+      };
+      const removeQuestion = (id) => {
+        setForm((f) => ({ ...f, questions: f.questions.filter((q) => q.id !== id) }));
+      };
+      const moveQuestion = (id, dir) => {
+        setForm((f) => {
+          const qs = [...f.questions];
+          const i = qs.findIndex((q) => q.id === id);
+          const j = i + dir;
+          if (i < 0 || j < 0 || j >= qs.length) return f;
+          [qs[i], qs[j]] = [qs[j], qs[i]];
+          return { ...f, questions: qs };
+        });
+      };
+      const updateScaleLabel = (i, value) => {
+        setForm((f) => {
+          const scale = [...f.scale];
+          scale[i] = value;
+          return { ...f, scale };
+        });
+      };
+      const addScaleLabel = () => {
+        setForm((f) => (f.scale.length >= 7 ? f : { ...f, scale: [...f.scale, "New option"] }));
+      };
+      const removeScaleLabel = (i) => {
+        setForm((f) => (f.scale.length <= 2 ? f : { ...f, scale: f.scale.filter((_, k) => k !== i) }));
+      };
+      const resetToPSI = () => {
+        if (!confirmReset) {
+          setConfirmReset(true);
+          setTimeout(() => setConfirmReset(false), 3000);
+          return;
+        }
+        setConfirmReset(false);
+        setForm(psiForm());
+        setAnswers({});
+      };
+
+      const askable = form.questions.filter((q) => q.text.trim().length > 0);
+
+      // ─── scoring ───
+      const getScore = (q) => {
+        const v = answers[q.id];
+        if (v === undefined || v === null) return null;
+        if (q.type === "choice" && Array.isArray(q.choices)) {
+          const choice = q.choices[v];
+          return choice ? choice.score : null;
+        }
+        if (q.type === "scale" && typeof v === "number") {
+          const start = typeof form.scaleStart === "number" ? form.scaleStart : 1;
+          return (form.scale.length - 1 - v) + start;
+        }
+        return null;
+      };
+
+      const categoryTotals = () => {
+        const totals = {};
+        askable.forEach((q) => {
+          if (!q.category) return;
+          const score = getScore(q);
+          if (score === null) return;
+          if (!totals[q.category]) totals[q.category] = { sum: 0, n: 0, max: 0 };
+          totals[q.category].sum += score;
+          totals[q.category].n += 1;
+          totals[q.category].max += 5; // each item max = 5
+        });
+        const subKeys = Object.keys(totals);
+        if (subKeys.length > 0) {
+          let totalSum = 0, totalN = 0, totalMax = 0;
+          subKeys.forEach((k) => {
+            totalSum += totals[k].sum;
+            totalN += totals[k].n;
+            totalMax += totals[k].max;
+          });
+          totals["Total Stress"] = { sum: totalSum, n: totalN, max: totalMax };
+        }
+        return totals;
+      };
+
+      // ─── fill mode ───
+      const startFill = () => {
+        if (askable.length === 0) return;
+        setAnswers({});
+        setIdx(0);
+        setCopied(false);
+        setMode("fill");
+      };
+      const current = askable[idx];
+      const next = () => {
+        if (idx + 1 >= askable.length) setMode("done");
+        else setIdx(idx + 1);
+      };
+      const back = () => {
+        if (idx === 0) setMode("build");
+        else setIdx(idx - 1);
+      };
+
+      // ─── results helpers ───
+      const summaryText = () => {
+        const lines = [form.title, new Date().toLocaleDateString(), ""];
+        askable.forEach((q, i) => {
+          const score = getScore(q);
+          let a = "(skipped)";
+          if (score !== null) {
+            if (q.type === "choice" && Array.isArray(q.choices)) {
+              a = q.choices[answers[q.id]]?.label + " (" + score + ")";
+            } else if (q.type === "scale") {
+              a = form.scale[answers[q.id]] + " (" + score + ")";
+            }
+          }
+          lines.push((i + 1) + ". " + q.text);
+          lines.push("   " + a);
+        });
+        const totals = categoryTotals();
+        const keys = Object.keys(totals);
+        if (keys.length) {
+          lines.push("");
+          lines.push("Subscale Totals");
+          keys.forEach((k) => {
+            lines.push(k + ": " + totals[k].sum + " of " + totals[k].max + " (" + totals[k].n + " items)");
+          });
+        }
+        return lines.join("\n");
+      };
+
+      const copySummary = async () => {
+        const text = summaryText();
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch (e) {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            setCopied(true);
+          } catch (err) {
+            setCopied(false);
+          }
+        }
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      const Eyebrow = ({ children, dark }) => (
+        <div
+          className="cib-body text-xs font-bold uppercase tracking-widest mb-2"
+          style={{ color: dark ? "var(--soft-on-dark)" : "var(--moss)", letterSpacing: "0.14em" }}
+        >
+          {children}
+        </div>
+      );
+
+      const existingCategories = Array.from(
+        new Set(form.questions.map((q) => q.category).filter(Boolean))
+      );
+
+      // ─── BUILD MODE ───
+      if (mode === "build") {
+        return (
+          <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+            <style>{FONT_CSS_PSI}</style>
+            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+
+              {/* Back to Dashboard Banner */}
+              <div className="flex justify-between items-center mb-6">
+                <button onClick={onBack} className="text-xs font-bold uppercase tracking-wider transition-colors hover:text-[#7FA08C]" style={{ color: "var(--ink-soft)" }}>
+                  &larr; Back to Dashboard
+                </button>
+              </div>
+
+              <Eyebrow>PSI-4-SF Recorder</Eyebrow>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                aria-label="Form title"
+                className="cib-display w-full bg-transparent text-3xl leading-tight mb-1 border-0"
+                style={{ color: "var(--spruce)" }}
+              />
+              <input
+                value={form.subtitle || ""}
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+                aria-label="Form subtitle"
+                className="cib-body w-full bg-transparent text-sm mb-4 border-0"
+                style={{ color: "var(--ink-soft)" }}
+              />
+              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+                {askable.length} items loaded. Edit questions, scale labels, or categories below.
+                {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
+                {saveState === "off" && <span> Saving is off here.</span>}
+              </p>
+
+              {showDisclaimer && (
+                <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <Eyebrow>About this instrument</Eyebrow>
+                    <button onClick={() => setShowDisclaimer(false)} className="text-sm" style={{ color: "var(--ink-soft)" }}>✕</button>
+                  </div>
+                  <p className="text-xs mb-2" style={{ color: "var(--ink-soft)" }}>
+                    The Parenting Stress Index, 4th Edition, Short Form (PSI-4-SF) is a copyrighted
+                    instrument published by Psychological Assessment Resources, Inc. This app records
+                    responses only. Scoring interpretation, and clinical decisions must follow the
+                    official manual and materials.
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                    <strong>Subscales:</strong> Parent Distress (PD) · Parent-Child Dysfunctional
+                    Interaction (PCDI) · Difficult Child (DC). Raw totals are shown below; convert
+                    to standard scores using the official profile.
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>Answer scale</Eyebrow>
+                <p className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+                  Strongly Agree scores highest ({form.scale.length - 1 + (form.scaleStart || 1)}),
+                  Strongly Disagree scores lowest ({form.scaleStart || 1}).
+                </p>
+                {form.scale.map((label, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "var(--mist)", color: "var(--spruce)" }}>
+                      {form.scale.length - 1 - i + (form.scaleStart || 1)}
+                    </span>
+                    <input
+                      value={label}
+                      onChange={(e) => updateScaleLabel(i, e.target.value)}
+                      aria-label={"Scale option " + i}
+                      className="flex-1 rounded-lg px-3 py-2 text-sm border"
+                      style={{ borderColor: "var(--mist)", background: "var(--paper)" }}
+                    />
+                    <button onClick={() => removeScaleLabel(i)} aria-label={"Remove " + i} className="w-8 h-8 rounded-lg text-sm flex-shrink-0" style={{ color: "var(--ink-soft)", background: "transparent" }}>✕</button>
+                  </div>
+                ))}
+                {form.scale.length < 7 && (
+                  <button onClick={addScaleLabel} className="text-sm font-bold mt-1" style={{ color: "var(--moss)" }}>+ Add option</button>
+                )}
+              </div>
+
+              <Eyebrow>Questions</Eyebrow>
+              {form.questions.map((q, i) => (
+                <div key={q.id} className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="cib-display text-lg" style={{ color: "var(--moss)" }}>{i + 1}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => moveQuestion(q.id, -1)} aria-label="Move up" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↑</button>
+                      <button onClick={() => moveQuestion(q.id, 1)} aria-label="Move down" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↓</button>
+                      <button onClick={() => removeQuestion(q.id)} aria-label="Delete" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--ink-soft)" }}>✕</button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={q.text}
+                    onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
+                    placeholder="Write your question here"
+                    rows={2}
+                    aria-label={"Question " + (i + 1)}
+                    className="w-full rounded-lg px-3 py-2 text-base border mb-3 resize-none border-[#E4E9E2]"
+                    style={{ background: "var(--paper)", color: "var(--ink)" }}
+                  />
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      onClick={() => updateQuestion(q.id, { type: "scale", choices: undefined })}
+                      className="flex-1 rounded-lg py-2 text-sm font-bold transition-all"
+                      style={q.type === "scale" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--paper)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}
+                    >Scale</button>
+                    <button
+                      onClick={() => updateQuestion(q.id, { type: "text" })}
+                      className="flex-1 rounded-lg py-2 text-sm font-bold transition-all"
+                      style={q.type === "text" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--paper)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}
+                    >Open answer</button>
+                    <button
+                      onClick={() => updateQuestion(q.id, { type: "choice" })}
+                      className="flex-1 rounded-lg py-2 text-sm font-bold transition-all"
+                      style={q.type === "choice" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--paper)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}
+                    >Custom</button>
+                  </div>
+                  {q.type === "choice" && (
+                    <div className="mb-3">
+                      <p className="text-xs mb-2" style={{ color: "var(--ink-soft)" }}>Choices (score shown in parentheses):</p>
+                      {(q.choices || []).map((c, ci) => (
+                        <div key={ci} className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-bold w-6 text-center" style={{ color: "var(--moss)" }}>{c.score}</span>
+                          <input
+                            value={c.label}
+                            onChange={(e) => {
+                              const newChoices = [...(q.choices || [])];
+                              newChoices[ci] = { ...c, label: e.target.value };
+                              updateQuestion(q.id, { choices: newChoices });
+                            }}
+                            className="flex-1 rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]"
+                            style={{ background: "var(--paper)" }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    value={q.category}
+                    onChange={(e) => updateQuestion(q.id, { category: e.target.value })}
+                    placeholder="Subscale / category"
+                    aria-label={"Question " + (i + 1) + " category"}
+                    className="w-full rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]"
+                    style={{ background: "var(--paper)" }}
+                  />
+                  {existingCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {existingCategories.map((c) => (
+                        <button key={c} onClick={() => updateQuestion(q.id, { category: c })} className="text-xs px-2 py-1 rounded-full transition-colors hover:bg-[#c3d1c8]" style={{ background: "var(--mist)", color: "var(--spruce)" }}>{c}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button onClick={addQuestion} className="w-full rounded-2xl py-3 text-base font-bold mb-3 transition-colors hover:bg-[#fcfbf9]" style={{ background: "var(--card)", color: "var(--spruce)", border: "2px dashed var(--moss)" }}>
+                + Add a question
+              </button>
+
+              <button onClick={resetToPSI} className="w-full py-2 text-sm transition-colors hover:text-opacity-80" style={{ color: confirmReset ? "var(--alert)" : "var(--ink-soft)" }}>
+                {confirmReset ? "Tap again to restore PSI-4-SF defaults" : "Restore PSI-4-SF defaults"}
+              </button>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
+              <div className="max-w-md mx-auto">
+                <button
+                  onClick={startFill}
+                  disabled={askable.length === 0}
+                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
+                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+                >
+                  Hand it over · {askable.length} items
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── FILL MODE ───
+      if (mode === "fill" && current) {
+        const progress = ((idx + 1) / askable.length) * 100;
+        const value = answers[current.id];
+        return (
+          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+            <style>{FONT_CSS_PSI}</style>
+            <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
+              <div className="mb-8">
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                </div>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                  <div className="h-1 rounded-full" style={{ width: progress + "%", background: "var(--lamplight)", transition: "width 300ms ease" }} />
+                </div>
+              </div>
+
+              <div key={current.id} className="cib-fade flex-1 flex flex-col">
+                {current.category ? <Eyebrow dark>{current.category}</Eyebrow> : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                  {current.text}
+                </h1>
+
+                {current.type === "scale" ? (
+                  <div className="flex flex-col gap-3">
+                    {form.scale.map((label, i) => {
+                      const selected = value === i;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setAnswers({ ...answers, [current.id]: i })}
+                          className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
+                          style={selected
+                            ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
+                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                          }
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : current.type === "choice" && Array.isArray(current.choices) ? (
+                  <div className="flex flex-col gap-3">
+                    {current.choices.map((choice, i) => {
+                      const selected = value === i;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setAnswers({ ...answers, [current.id]: i })}
+                          className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
+                          style={selected
+                            ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
+                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                          }
+                        >
+                          {choice.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <textarea
+                    value={typeof value === "string" ? value : ""}
+                    onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
+                    placeholder="Whatever comes to mind is fine here."
+                    rows={5}
+                    aria-label="Your answer"
+                    className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                  />
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                  Back
+                </button>
+                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
+                  {idx + 1 >= askable.length ? "Finish" : "Next"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── DONE / RESULTS ───
+      const totals = categoryTotals();
+      const totalKeys = Object.keys(totals);
+      const answeredCount = askable.filter((q) => answers[q.id] !== undefined).length;
+
+      return (
+        <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+          <style>{FONT_CSS_PSI}</style>
+          <div className="max-w-md mx-auto px-4 py-8 cib-fade">
+            <Eyebrow>All done</Eyebrow>
+            <h1 className="cib-display text-3xl mb-2" style={{ color: "var(--spruce)" }}>Thank you.</h1>
+            <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              {answeredCount} of {askable.length} items answered. Answers live only on this screen.
+              Copy them before you close or start over.
+            </p>
+
+            {totalKeys.length > 0 && (
+              <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                <Eyebrow dark>Raw subscale totals</Eyebrow>
+                {totalKeys.map((k) => (
+                  <div key={k} className="flex justify-between items-baseline mb-2">
+                    <span className="font-bold text-sm">{k}</span>
+                    <span className="cib-display text-xl">
+                      {totals[k].sum}
+                      <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}> / {totals[k].max}</span>
+                    </span>
+                  </div>
+                ))}
+                <p className="text-xs mt-3" style={{ color: "var(--soft-on-dark)" }}>
+                  These are raw scores. Convert to standard scores and percentiles using the official PSI-4-SF manual and profile.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+              {askable.map((q, i) => {
+                const score = getScore(q);
+                let a = "Skipped";
+                if (score !== null) {
+                  if (q.type === "choice" && Array.isArray(q.choices)) a = q.choices[answers[q.id]]?.label;
+                  else if (q.type === "scale") a = form.scale[answers[q.id]];
+                  else if (q.type === "text" && typeof answers[q.id] === "string") a = answers[q.id].trim();
+                } else if (q.type === "text" && typeof answers[q.id] === "string" && answers[q.id].trim()) {
+                  a = answers[q.id].trim();
+                }
+                return (
+                  <div key={q.id} className="py-3" style={i < askable.length - 1 ? { borderBottom: "1px solid var(--mist)" } : {}}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="text-sm" style={{ color: "var(--ink-soft)" }}>{i + 1}. {q.text}</div>
+                      {score !== null && <div className="text-xs font-bold flex-shrink-0" style={{ color: "var(--moss)" }}>{score}</div>}
+                    </div>
+                    <div className="font-bold mt-1" style={{ color: "var(--spruce)" }}>{a}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+              {copied ? "Copied" : "Copy answers"}
+            </button>
+            <div className="flex gap-3">
+              <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                New check-in
+              </button>
+              <button onClick={() => setMode("build")} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                Back to builder
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Component 2: PKBS-2 Response Recorder
+    // ─────────────────────────────────────────────────────────────
+    function PKBS2Recorder({ onBack }) {
+      const [form, setForm] = useState(pkbsForm);
+      const [mode, setMode] = useState("build"); // build | fill | done
+      const [answers, setAnswers] = useState({});
+      const [idx, setIdx] = useState(0);
+      const [saveState, setSaveState] = useState("idle");
+      const [copied, setCopied] = useState(false);
+      const [confirmReset, setConfirmReset] = useState(false);
+      const [showDisclaimer, setShowDisclaimer] = useState(true);
+      const [raterInfo, setRaterInfo] = useState({ childName: "", ageYears: "", ageMonths: "", sex: "", ratedBy: "", relationship: "", date: "", setting: "" });
+      const [activeScaleFilter, setActiveScaleFilter] = useState("all"); // all | social | problem
+      const loadedRef = useRef(false);
+
+      // Load saved form
+      useEffect(() => {
+        let alive = true;
+        (async () => {
+          try {
+            if (!window.storage) {
+              if (alive) setSaveState("off");
+              loadedRef.current = true;
+              return;
+            }
+            const result = await window.storage.get(FORM_STORAGE_KEY_PKBS);
+            if (alive && result && result.value) {
+              const parsed = JSON.parse(result.value);
+              if (parsed && Array.isArray(parsed.questions)) setForm(parsed);
+            }
+          } catch (e) {
+            // ignore
+          } finally {
+            loadedRef.current = true;
+          }
+        })();
+        return () => { alive = false; };
+      }, []);
+
+      // Persist form
+      useEffect(() => {
+        if (!loadedRef.current) return;
+        let cancelled = false;
+        const t = setTimeout(async () => {
+          try {
+            if (!window.storage) return;
+            await window.storage.set(FORM_STORAGE_KEY_PKBS, JSON.stringify(form));
+            if (!cancelled) {
+              setSaveState("saved");
+              setTimeout(() => { if (!cancelled) setSaveState("idle"); }, 1500);
+            }
+          } catch (e) {
+            if (!cancelled) setSaveState("off");
+          }
+        }, 600);
+        return () => { cancelled = true; clearTimeout(t); };
+      }, [form]);
+
+      // ─── editing helpers ───
+      const updateQuestion = (id, patch) => {
+        setForm((f) => ({
+          ...f,
+          questions: f.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+        }));
+      };
+      const addQuestion = () => {
+        setForm((f) => ({
+          ...f,
+          questions: [...f.questions, { id: newId(), text: "", type: "scale", category: "" }],
+        }));
+      };
+      const removeQuestion = (id) => {
+        setForm((f) => ({ ...f, questions: f.questions.filter((q) => q.id !== id) }));
+      };
+      const moveQuestion = (id, dir) => {
+        setForm((f) => {
+          const qs = [...f.questions];
+          const i = qs.findIndex((q) => q.id === id);
+          const j = i + dir;
+          if (i < 0 || j < 0 || j >= qs.length) return f;
+          [qs[i], qs[j]] = [qs[j], qs[i]];
+          return { ...f, questions: qs };
+        });
+      };
+      const updateScaleLabel = (i, value) => {
+        setForm((f) => {
+          const scale = [...f.scale];
+          scale[i] = value;
+          return { ...f, scale };
+        });
+      };
+      const addScaleLabel = () => {
+        setForm((f) => (f.scale.length >= 7 ? f : { ...f, scale: [...f.scale, "New option"] }));
+      };
+      const removeScaleLabel = (i) => {
+        setForm((f) => (f.scale.length <= 2 ? f : { ...f, scale: f.scale.filter((_, k) => k !== i) }));
+      };
+      const resetToPKBS = () => {
+        if (!confirmReset) {
+          setConfirmReset(true);
+          setTimeout(() => setConfirmReset(false), 3000);
+          return;
+        }
+        setConfirmReset(false);
+        setForm(pkbsForm());
+        setAnswers({});
+      };
+
+      // Filter questions by scale for fill mode
+      const getFilteredQuestions = () => {
+        const askable = form.questions.filter((q) => q.text.trim().length > 0);
+        if (activeScaleFilter === "social") {
+          return askable.filter((q) =>
+            ["Social Cooperation", "Social Interaction", "Social Independence"].includes(q.category)
+          );
+        }
+        if (activeScaleFilter === "problem") {
+          return askable.filter((q) =>
+            ["Externalizing Problems", "Internalizing Problems"].includes(q.category)
+          );
+        }
+        return askable;
+      };
+
+      const askable = getFilteredQuestions();
+
+      // ─── scoring ───
+      const getScore = (q) => {
+        const v = answers[q.id];
+        if (v === undefined || v === null) return null;
+        if (q.type === "scale" && typeof v === "number") {
+          const start = typeof form.scaleStart === "number" ? form.scaleStart : 0;
+          return v + start; // index 0 = start score
+        }
+        return null;
+      };
+
+      const categoryTotals = () => {
+        const totals = {};
+        askable.forEach((q) => {
+          if (!q.category) return;
+          const score = getScore(q);
+          if (score === null) return;
+          if (!totals[q.category]) totals[q.category] = { sum: 0, n: 0, max: 0 };
+          totals[q.category].sum += score;
+          totals[q.category].n += 1;
+          totals[q.category].max += (form.scale.length - 1) + (form.scaleStart || 0);
+        });
+        const socialKeys = ["Social Cooperation", "Social Interaction", "Social Independence"];
+        const problemKeys = ["Externalizing Problems", "Internalizing Problems"];
+        const socialItems = socialKeys.filter((k) => totals[k]);
+        const problemItems = problemKeys.filter((k) => totals[k]);
+        if (socialItems.length) {
+          let sum = 0, n = 0, max = 0;
+          socialItems.forEach((k) => { sum += totals[k].sum; n += totals[k].n; max += totals[k].max; });
+          totals["Social Skills Composite"] = { sum, n, max };
+        }
+        if (problemItems.length) {
+          let sum = 0, n = 0, max = 0;
+          problemItems.forEach((k) => { sum += totals[k].sum; n += totals[k].n; max += totals[k].max; });
+          totals["Problem Behavior Composite"] = { sum, n, max };
+        }
+        return totals;
+      };
+
+      // ─── fill mode ───
+      const startFill = () => {
+        if (askable.length === 0) return;
+        setAnswers({});
+        setIdx(0);
+        setCopied(false);
+        setMode("fill");
+      };
+      const current = askable[idx];
+      const next = () => {
+        if (idx + 1 >= askable.length) setMode("done");
+        else setIdx(idx + 1);
+      };
+      const back = () => {
+        if (idx === 0) setMode("build");
+        else setIdx(idx - 1);
+      };
+
+      // ─── results helpers ───
+      const summaryText = () => {
+        const lines = [
+          form.title + " — " + form.subtitle,
+          "Date: " + (raterInfo.date || new Date().toLocaleDateString()),
+          "Child: " + (raterInfo.childName || "(not provided)"),
+          "Age: " + (raterInfo.ageYears || "?") + "y " + (raterInfo.ageMonths || "?") + "m  |  Sex: " + (raterInfo.sex || "?"),
+          "Rated by: " + (raterInfo.ratedBy || "(not provided)") + " (" + (raterInfo.relationship || "?") + ")",
+          "Setting: " + (raterInfo.setting || "(not provided)"),
+          "",
+        ];
+        askable.forEach((q, i) => {
+          const score = getScore(q);
+          let a = "(skipped)";
+          if (score !== null) a = form.scale[answers[q.id]] + " (" + score + ")";
+          lines.push((i + 1) + ". " + q.text);
+          lines.push("   " + a);
+        });
+        const totals = categoryTotals();
+        const keys = Object.keys(totals);
+        if (keys.length) {
+          lines.push("");
+          lines.push("Raw Subscale Totals");
+          keys.forEach((k) => {
+            lines.push(k + ": " + totals[k].sum + " of " + totals[k].max + " (" + totals[k].n + " items)");
+          });
+        }
+        return lines.join("\n");
+      };
+
+      const copySummary = async () => {
+        const text = summaryText();
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch (e) {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            setCopied(true);
+          } catch (err) {
+            setCopied(false);
+          }
+        }
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      const Eyebrow = ({ children, dark }) => (
+        <div className="cib-body text-xs font-bold uppercase tracking-widest mb-2" style={{ color: dark ? "var(--soft-on-dark)" : "var(--moss)", letterSpacing: "0.14em" }}>
+          {children}
+        </div>
+      );
+
+      const existingCategories = Array.from(new Set(form.questions.map((q) => q.category).filter(Boolean)));
+
+      const socialSkillsCount = form.questions.filter((q) =>
+        ["Social Cooperation", "Social Interaction", "Social Independence"].includes(q.category)
+      ).length;
+      const problemBehaviorCount = form.questions.filter((q) =>
+        ["Externalizing Problems", "Internalizing Problems"].includes(q.category)
+      ).length;
+
+      // ─── BUILD MODE ───
+      if (mode === "build") {
+        return (
+          <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+            <style>{FONT_CSS_PKBS}</style>
+            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+
+              {/* Back to Dashboard Banner */}
+              <div className="flex justify-between items-center mb-6">
+                <button onClick={onBack} className="text-xs font-bold uppercase tracking-wider transition-colors hover:text-[#7FA08C]" style={{ color: "var(--ink-soft)" }}>
+                  &larr; Back to Dashboard
+                </button>
+              </div>
+
+              <Eyebrow>PKBS-2 Recorder</Eyebrow>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                aria-label="Form title"
+                className="cib-display w-full bg-transparent text-3xl leading-tight mb-1 border-0"
+                style={{ color: "var(--spruce)" }}
+              />
+              <input
+                value={form.subtitle || ""}
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+                aria-label="Form subtitle"
+                className="cib-body w-full bg-transparent text-sm mb-4 border-0"
+                style={{ color: "var(--ink-soft)" }}
+              />
+              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+                {socialSkillsCount} Social Skills items · {problemBehaviorCount} Problem Behavior items.
+                {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
+                {saveState === "off" && <span> Saving is off here.</span>}
+              </p>
+
+              {showDisclaimer && (
+                <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <Eyebrow>About this instrument</Eyebrow>
+                    <button onClick={() => setShowDisclaimer(false)} className="text-sm" style={{ color: "var(--ink-soft)" }}>✕</button>
+                  </div>
+                  <p className="text-xs mb-2" style={{ color: "var(--ink-soft)" }}>
+                    The Preschool and Kindergarten Behavior Scales — 2nd Edition (PKBS-2) is a
+                    copyrighted instrument published by PRO-ED, Inc. This app records responses only.
+                    Scoring, interpretation, and clinical decisions must follow the official manual.
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                    <strong>Social Skills:</strong> Social Cooperation (SC) · Social Interaction (INT) · Social Independence (IND).{" "}
+                    <strong>Problem Behavior:</strong> Externalizing Problems (EP) · Internalizing Problems (IP).
+                    Raw totals are shown; convert to standard scores and percentiles using the official manual.
+                  </p>
+                </div>
+              )}
+
+              {/* Rater Info */}
+              <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>Child & Rater Information</Eyebrow>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <input value={raterInfo.childName} onChange={(e) => setRaterInfo({ ...raterInfo, childName: e.target.value })} placeholder="Child's name" className="col-span-2 rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                  <input value={raterInfo.ageYears} onChange={(e) => setRaterInfo({ ...raterInfo, ageYears: e.target.value.replace(/\D/g, "") })} placeholder="Age (years)" inputMode="numeric" className="rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                  <input value={raterInfo.ageMonths} onChange={(e) => setRaterInfo({ ...raterInfo, ageMonths: e.target.value.replace(/\D/g, "") })} placeholder="Age (months)" inputMode="numeric" className="rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                  <select value={raterInfo.sex} onChange={(e) => setRaterInfo({ ...raterInfo, sex: e.target.value })} className="rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }}>
+                    <option value="">Sex</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                  </select>
+                  <input value={raterInfo.date} onChange={(e) => setRaterInfo({ ...raterInfo, date: e.target.value })} placeholder="Date (YYYY-MM-DD)" type="date" className="rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                </div>
+                <input value={raterInfo.ratedBy} onChange={(e) => setRaterInfo({ ...raterInfo, ratedBy: e.target.value })} placeholder="Rated by" className="w-full rounded-lg px-3 py-2 text-sm border mb-3 border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                <input value={raterInfo.relationship} onChange={(e) => setRaterInfo({ ...raterInfo, relationship: e.target.value })} placeholder="Relationship to child" className="w-full rounded-lg px-3 py-2 text-sm border mb-3 border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                <input value={raterInfo.setting} onChange={(e) => setRaterInfo({ ...raterInfo, setting: e.target.value })} placeholder="Setting(s) observed" className="w-full rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+              </div>
+
+              <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>Answer scale</Eyebrow>
+                <p className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+                  Rate based on observations during the past 3 months.
+                </p>
+                {form.scale.map((label, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "var(--mist)", color: "var(--spruce)" }}>
+                      {i + (form.scaleStart || 0)}
+                    </span>
+                    <input
+                      value={label}
+                      onChange={(e) => updateScaleLabel(i, e.target.value)}
+                      aria-label={"Scale option " + i}
+                      className="flex-1 rounded-lg px-3 py-2 text-sm border"
+                      style={{ borderColor: "var(--mist)", background: "var(--paper)" }}
+                    />
+                    <button onClick={() => removeScaleLabel(i)} aria-label={"Remove " + i} className="w-8 h-8 rounded-lg text-sm flex-shrink-0" style={{ color: "var(--ink-soft)", background: "transparent" }}>✕</button>
+                  </div>
+                ))}
+                {form.scale.length < 7 && (
+                  <button onClick={addScaleLabel} className="text-sm font-bold mt-1" style={{ color: "var(--moss)" }}>+ Add option</button>
+                )}
+              </div>
+
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => setActiveScaleFilter("all")} className="flex-1 rounded-lg py-2 text-sm font-bold" style={activeScaleFilter === "all" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}>All items</button>
+                <button onClick={() => setActiveScaleFilter("social")} className="flex-1 rounded-lg py-2 text-sm font-bold" style={activeScaleFilter === "social" ? { background: "var(--moss)", color: "var(--cream-on-dark)" } : { background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}>Social Skills</button>
+                <button onClick={() => setActiveScaleFilter("problem")} className="flex-1 rounded-lg py-2 text-sm font-bold" style={activeScaleFilter === "problem" ? { background: "var(--rose)", color: "var(--cream-on-dark)" } : { background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}>Problem Behavior</button>
+              </div>
+
+              <Eyebrow>Questions</Eyebrow>
+              {form.questions.length === 0 && (
+                <div className="rounded-2xl p-6 text-center text-sm mb-4" style={{ background: "var(--card)", border: "1px dashed var(--moss)", color: "var(--ink-soft)" }}>
+                  A blank page. Add your first question below.
+                </div>
+              )}
+              {form.questions.map((q, i) => (
+                <div key={q.id} className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="cib-display text-lg" style={{ color: "var(--moss)" }}>{i + 1}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => moveQuestion(q.id, -1)} aria-label="Move up" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↑</button>
+                      <button onClick={() => moveQuestion(q.id, 1)} aria-label="Move down" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↓</button>
+                      <button onClick={() => removeQuestion(q.id)} aria-label="Delete" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--ink-soft)" }}>✕</button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={q.text}
+                    onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
+                    placeholder="Write your question here"
+                    rows={2}
+                    aria-label={"Question " + (i + 1)}
+                    className="w-full rounded-lg px-3 py-2 text-base border mb-3 resize-none border-[#E4E9E2]"
+                    style={{ background: "var(--paper)", color: "var(--ink)" }}
+                  />
+                  <div className="flex gap-2 mb-3">
+                    <button onClick={() => updateQuestion(q.id, { type: "scale" })} className="flex-1 rounded-lg py-2 text-sm font-bold" style={q.type === "scale" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--paper)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}>Scale</button>
+                    <button onClick={() => updateQuestion(q.id, { type: "text" })} className="flex-1 rounded-lg py-2 text-sm font-bold" style={q.type === "text" ? { background: "var(--spruce)", color: "var(--cream-on-dark)" } : { background: "var(--paper)", color: "var(--ink-soft)", border: "1px solid var(--mist)" }}>Open answer</button>
+                  </div>
+                  <input
+                    value={q.category}
+                    onChange={(e) => updateQuestion(q.id, { category: e.target.value })}
+                    placeholder="Subscale / category"
+                    aria-label={"Question " + (i + 1) + " category"}
+                    className="w-full rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]"
+                    style={{ background: "var(--paper)" }}
+                  />
+                  {existingCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {existingCategories.map((c) => (
+                        <button key={c} onClick={() => updateQuestion(q.id, { category: c })} className="text-xs px-2 py-1 rounded-full transition-colors hover:bg-[#c3d1c8]" style={{ background: "var(--mist)", color: "var(--spruce)" }}>{c}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button onClick={addQuestion} className="w-full rounded-2xl py-3 text-base font-bold mb-3 transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "2px dashed var(--moss)" }}>
+                + Add a question
+              </button>
+
+              <button onClick={resetToPKBS} className="w-full py-2 text-sm transition-colors hover:text-opacity-80" style={{ color: confirmReset ? "var(--alert)" : "var(--ink-soft)" }}>
+                {confirmReset ? "Tap again to restore PKBS-2 defaults" : "Restore PKBS-2 defaults"}
+              </button>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
+              <div className="max-w-md mx-auto">
+                <button
+                  onClick={startFill}
+                  disabled={askable.length === 0}
+                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
+                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+                >
+                  Hand it over · {askable.length} items
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── FILL MODE ───
+      if (mode === "fill" && current) {
+        const progress = ((idx + 1) / askable.length) * 100;
+        const value = answers[current.id];
+        const isSocial = ["Social Cooperation", "Social Interaction", "Social Independence"].includes(current.category);
+        return (
+          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+            <style>{FONT_CSS_PKBS}</style>
+            <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
+              <div className="mb-8">
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                </div>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                  <div className="h-1 rounded-full" style={{ width: progress + "%", background: isSocial ? "var(--moss)" : "var(--lamplight)", transition: "width 300ms ease" }} />
+                </div>
+              </div>
+
+              <div key={current.id} className="cib-fade flex-1 flex flex-col">
+                {current.category ? (
+                  <Eyebrow dark>{current.category}</Eyebrow>
+                ) : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                  {current.text}
+                </h1>
+
+                {current.type === "scale" ? (
+                  <div className="flex flex-col gap-3">
+                    {form.scale.map((label, i) => {
+                      const selected = value === i;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setAnswers({ ...answers, [current.id]: i })}
+                          className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
+                          style={selected
+                            ? { background: "var(--lamplight)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(242,182,83,0.35)" }
+                            : { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }
+                          }
+                        >
+                          <span className="inline-block w-6 text-center mr-2 opacity-60">{i + (form.scaleStart || 0)}</span>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <textarea
+                    value={typeof value === "string" ? value : ""}
+                    onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
+                    placeholder="Whatever comes to mind is fine here."
+                    rows={5}
+                    aria-label="Your answer"
+                    className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                  />
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                  Back
+                </button>
+                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
+                  {idx + 1 >= askable.length ? "Finish" : "Next"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── DONE / RESULTS ───
+      const totals = categoryTotals();
+      const totalKeys = Object.keys(totals);
+      const answeredCount = askable.filter((q) => answers[q.id] !== undefined).length;
+
+      return (
+        <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+          <style>{FONT_CSS_PKBS}</style>
+          <div className="max-w-md mx-auto px-4 py-8 cib-fade">
+            <Eyebrow>All done</Eyebrow>
+            <h1 className="cib-display text-3xl mb-2" style={{ color: "var(--spruce)" }}>Thank you.</h1>
+            <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              {answeredCount} of {askable.length} items answered. Answers live only on this screen.
+              Copy them before you close or start over.
+            </p>
+
+            {/* Rater info summary */}
+            <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+              <Eyebrow>Child & Rater</Eyebrow>
+              <div className="text-sm" style={{ color: "var(--ink-soft)" }}>
+                <p><strong style={{ color: "var(--spruce)" }}>{raterInfo.childName || "(no name)"}</strong>{raterInfo.ageYears && ` · ${raterInfo.ageYears}y ${raterInfo.ageMonths || 0}m`}{raterInfo.sex && ` · ${raterInfo.sex}`}</p>
+                <p>Rated by {raterInfo.ratedBy || "(not provided)"}{raterInfo.relationship && ` (${raterInfo.relationship})`}</p>
+                <p>{raterInfo.date || new Date().toLocaleDateString()}{raterInfo.setting && ` · ${raterInfo.setting}`}</p>
+              </div>
+            </div>
+
+            {totalKeys.length > 0 && (
+              <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+                <Eyebrow dark>Raw subscale totals</Eyebrow>
+                {totalKeys.map((k) => (
+                  <div key={k} className="flex justify-between items-baseline mb-2">
+                    <span className="font-bold text-sm">{k}</span>
+                    <span className="cib-display text-xl">
+                      {totals[k].sum}
+                      <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}> / {totals[k].max}</span>
+                    </span>
+                  </div>
+                ))}
+                <p className="text-xs mt-3" style={{ color: "var(--soft-on-dark)" }}>
+                  These are raw scores. Convert to standard scores and percentiles using the official PKBS-2 manual and profile. Separate tables exist for home-based and school-based raters.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+              {askable.map((q, i) => {
+                const score = getScore(q);
+                let a = "Skipped";
+                if (score !== null) a = form.scale[answers[q.id]];
+                return (
+                  <div key={q.id} className="py-3" style={i < askable.length - 1 ? { borderBottom: "1px solid var(--mist)" } : {}}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="text-sm" style={{ color: "var(--ink-soft)" }}>{i + 1}. {q.text}</div>
+                      {score !== null && <div className="text-xs font-bold flex-shrink-0" style={{ color: "var(--moss)" }}>{score}</div>}
+                    </div>
+                    <div className="font-bold mt-1" style={{ color: "var(--spruce)" }}>{a}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+              {copied ? "Copied" : "Copy answers"}
+            </button>
+            <div className="flex gap-3">
+              <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                New check-in
+              </button>
+              <button onClick={() => setMode("build")} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                Back to builder
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Component 3: TESI-PRR Response Recorder
+    // ─────────────────────────────────────────────────────────────
+    function TESIPRRRecorder({ onBack }) {
+      const [form, setForm] = useState(tesiForm);
+      const [mode, setMode] = useState("build"); // build | fill | done
+      const [answers, setAnswers] = useState({}); // id -> index (0=Yes,1=No,2=Unsure); id+"_desc" -> string
+      const [idx, setIdx] = useState(0);
+      const [saveState, setSaveState] = useState("idle");
+      const [copied, setCopied] = useState(false);
+      const [confirmReset, setConfirmReset] = useState(false);
+      const [showDisclaimer, setShowDisclaimer] = useState(true);
+      const [raterInfo, setRaterInfo] = useState({ childName: "", caregiverName: "", date: "" });
+      const loadedRef = useRef(false);
+
+      // Load saved form
+      useEffect(() => {
+        let alive = true;
+        (async () => {
+          try {
+            if (!window.storage) {
+              if (alive) setSaveState("off");
+              loadedRef.current = true;
+              return;
+            }
+            const result = await window.storage.get(FORM_STORAGE_KEY_TESI);
+            if (alive && result && result.value) {
+              const parsed = JSON.parse(result.value);
+              if (parsed && Array.isArray(parsed.questions)) setForm(parsed);
+            }
+          } catch (e) {
+            // ignore
+          } finally {
+            loadedRef.current = true;
+          }
+        })();
+        return () => { alive = false; };
+      }, []);
+
+      // Persist form
+      useEffect(() => {
+        if (!loadedRef.current) return;
+        let cancelled = false;
+        const t = setTimeout(async () => {
+          try {
+            if (!window.storage) return;
+            await window.storage.set(FORM_STORAGE_KEY_TESI, JSON.stringify(form));
+            if (!cancelled) {
+              setSaveState("saved");
+              setTimeout(() => { if (!cancelled) setSaveState("idle"); }, 1500);
+            }
+          } catch (e) {
+            if (!cancelled) setSaveState("off");
+          }
+        }, 600);
+        return () => { cancelled = true; clearTimeout(t); };
+      }, [form]);
+
+      // ─── editing helpers ───
+      const updateQuestion = (id, patch) => {
+        setForm((f) => ({
+          ...f,
+          questions: f.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+        }));
+      };
+      const addQuestion = () => {
+        setForm((f) => ({
+          ...f,
+          questions: [...f.questions, { id: newId(), text: "", type: "yesno", category: "Trauma Exposure" }],
+        }));
+      };
+      const removeQuestion = (id) => {
+        setForm((f) => ({ ...f, questions: f.questions.filter((q) => q.id !== id) }));
+      };
+      const moveQuestion = (id, dir) => {
+        setForm((f) => {
+          const qs = [...f.questions];
+          const i = qs.findIndex((q) => q.id === id);
+          const j = i + dir;
+          if (i < 0 || j < 0 || j >= qs.length) return f;
+          [qs[i], qs[j]] = [qs[j], qs[i]];
+          return { ...f, questions: qs };
+        });
+      };
+      const resetToTESI = () => {
+        if (!confirmReset) {
+          setConfirmReset(true);
+          setTimeout(() => setConfirmReset(false), 3000);
+          return;
+        }
+        setConfirmReset(false);
+        setForm(tesiForm());
+        setAnswers({});
+      };
+
+      const askable = form.questions.filter((q) => q.text.trim().length > 0);
+
+      // ─── scoring: count endorsed (Yes) and unsure ───
+      const endorsedCount = askable.filter((q) => answers[q.id] === 0).length;
+      const unsureCount = askable.filter((q) => answers[q.id] === 2).length;
+      const noCount = askable.filter((q) => answers[q.id] === 1).length;
+
+      // ─── fill mode ───
+      const startFill = () => {
+        if (askable.length === 0) return;
+        setAnswers({});
+        setIdx(0);
+        setCopied(false);
+        setMode("fill");
+      };
+      const current = askable[idx];
+      const next = () => {
+        if (idx + 1 >= askable.length) setMode("done");
+        else setIdx(idx + 1);
+      };
+      const back = () => {
+        if (idx === 0) setMode("build");
+        else setIdx(idx - 1);
+      };
+
+      // ─── results helpers ───
+      const summaryText = () => {
+        const lines = [
+          form.title + " — " + form.subtitle,
+          "Date: " + (raterInfo.date || new Date().toLocaleDateString()),
+          "Child: " + (raterInfo.childName || "(not provided)"),
+          "Caregiver / informant: " + (raterInfo.caregiverName || "(not provided)"),
+          "",
+        ];
+        askable.forEach((q, i) => {
+          const v = answers[q.id];
+          let a = "(skipped)";
+          if (v === 0 || v === 1 || v === 2) a = form.scale[v];
+          lines.push((i + 1) + ". " + q.text);
+          lines.push("   " + a);
+          if (q.describe) {
+            const d = answers[q.id + "_desc"];
+            if (typeof d === "string" && d.trim()) lines.push("   Describe: " + d.trim());
+          }
+        });
+        lines.push("");
+        lines.push("Events endorsed (Yes): " + endorsedCount + " of " + askable.length);
+        lines.push("Unsure: " + unsureCount + "  |  No: " + noCount);
+        lines.push("");
+        lines.push("Note: A definitive PTSD Criterion A / A-2 trauma count requires the full interview and clinician judgment per the official TESI-PRR manual.");
+        return lines.join("\n");
+      };
+
+      const copySummary = async () => {
+        const text = summaryText();
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch (e) {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            setCopied(true);
+          } catch (err) {
+            setCopied(false);
+          }
+        }
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      const Eyebrow = ({ children, dark }) => (
+        <div className="cib-body text-xs font-bold uppercase tracking-widest mb-2" style={{ color: dark ? "var(--soft-on-dark)" : "var(--alert)", letterSpacing: "0.14em" }}>
+          {children}
+        </div>
+      );
+
+      // Yes = alert/terracotta; No = spruce; Unsure = muted
+      const optionColor = (i, selected) => {
+        if (!selected) {
+          return { background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" };
+        }
+        if (i === 0) return { background: "var(--alert)", color: "var(--cream-on-dark)", boxShadow: "0 0 0 3px rgba(180,85,46,0.35)" };
+        if (i === 1) return { background: "var(--cream-on-dark)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(244,239,228,0.35)" };
+        return { background: "var(--soft-on-dark)", color: "var(--spruce-deep)", boxShadow: "0 0 0 3px rgba(168,187,175,0.35)" };
+      };
+
+      // ─── BUILD MODE ───
+      if (mode === "build") {
+        return (
+          <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+            <style>{FONT_CSS_TESI}</style>
+            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+
+              {/* Back to Dashboard Banner */}
+              <div className="flex justify-between items-center mb-6">
+                <button onClick={onBack} className="text-xs font-bold uppercase tracking-wider transition-colors hover:text-[#B4552E]" style={{ color: "var(--ink-soft)" }}>
+                  &larr; Back to Dashboard
+                </button>
+              </div>
+
+              <Eyebrow>TESI-PRR Recorder</Eyebrow>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                aria-label="Form title"
+                className="cib-display w-full bg-transparent text-3xl leading-tight mb-1 border-0"
+                style={{ color: "var(--spruce)" }}
+              />
+              <input
+                value={form.subtitle || ""}
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+                aria-label="Form subtitle"
+                className="cib-body w-full bg-transparent text-sm mb-4 border-0"
+                style={{ color: "var(--ink-soft)" }}
+              />
+              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+                {askable.length} screening items. Yes / No / Unsure per item.
+                {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
+                {saveState === "off" && <span> Saving is off here.</span>}
+              </p>
+
+              {showDisclaimer && (
+                <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <Eyebrow>About this instrument</Eyebrow>
+                    <button onClick={() => setShowDisclaimer(false)} className="text-sm" style={{ color: "var(--ink-soft)" }}>✕</button>
+                  </div>
+                  <p className="text-xs mb-2" style={{ color: "var(--ink-soft)" }}>
+                    The Traumatic Events Screening Inventory — Parent Report Revised (TESI-PRR) probes a
+                    child's history of exposure to potentially traumatic events and distinguishes these
+                    from other negative life experiences. Ippen, Ford, Acker, Bosquet, Ellis, Schiffman,
+                    Ribbe, Cone, Lukovitz, &amp; Edwards (2002), National Center for PTSD. This app
+                    records responses only.
+                  </p>
+                  <p className="text-xs mb-2" style={{ color: "var(--ink-soft)" }}>
+                    <strong>Administer as an interview.</strong> The TESI-PRR is a caregiver version for
+                    children under 7 (usable with any age) and takes about 20–30 minutes. It should always
+                    be administered as an interview, not self-completed.
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                    The overall score sums items whose responses meet both Criterion A and Criterion A-2
+                    for PTSD in the DSM-IV. This recorder tallies endorsed (Yes) items only; the
+                    Criterion A / A-2 determination requires clinician judgment per the official manual.
+                  </p>
+                </div>
+              )}
+
+              {/* Caregiver / Child Info */}
+              <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>Child & Caregiver Information</Eyebrow>
+                <input value={raterInfo.childName} onChange={(e) => setRaterInfo({ ...raterInfo, childName: e.target.value })} placeholder="Child's name" className="w-full rounded-lg px-3 py-2 text-sm border mb-3 border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                <input value={raterInfo.caregiverName} onChange={(e) => setRaterInfo({ ...raterInfo, caregiverName: e.target.value })} placeholder="Caregiver / informant name" className="w-full rounded-lg px-3 py-2 text-sm border mb-3 border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+                <input value={raterInfo.date} onChange={(e) => setRaterInfo({ ...raterInfo, date: e.target.value })} placeholder="Date" type="date" className="w-full rounded-lg px-3 py-2 text-sm border border-[#E4E9E2]" style={{ background: "var(--paper)" }} />
+              </div>
+
+              <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                <Eyebrow>Answer options</Eyebrow>
+                <p className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+                  Each item is answered Yes, No, or Unsure. A "Yes" counts as an endorsed event.
+                </p>
+                <div className="flex gap-2">
+                  {form.scale.map((label, i) => (
+                    <span key={i} className="flex-1 text-center rounded-lg py-2 text-sm font-bold" style={{ background: "var(--paper)", color: i === 0 ? "var(--alert)" : "var(--spruce)", border: "1px solid var(--mist)" }}>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <Eyebrow>Items</Eyebrow>
+              {form.questions.length === 0 && (
+                <div className="rounded-2xl p-6 text-center text-sm mb-4" style={{ background: "var(--card)", border: "1px dashed var(--alert)", color: "var(--ink-soft)" }}>
+                  A blank page. Add your first item below.
+                </div>
+              )}
+              {form.questions.map((q, i) => (
+                <div key={q.id} className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="cib-display text-lg" style={{ color: "var(--alert)" }}>{i + 1}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => moveQuestion(q.id, -1)} aria-label="Move up" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↑</button>
+                      <button onClick={() => moveQuestion(q.id, 1)} aria-label="Move down" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--spruce)" }}>↓</button>
+                      <button onClick={() => removeQuestion(q.id)} aria-label="Delete" className="w-8 h-8 rounded-lg text-sm" style={{ background: "var(--paper)", color: "var(--ink-soft)" }}>✕</button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={q.text}
+                    onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
+                    placeholder="Write the screening prompt here"
+                    rows={3}
+                    aria-label={"Item " + (i + 1)}
+                    className="w-full rounded-lg px-3 py-2 text-base border mb-3 resize-none border-[#E4E9E2]"
+                    style={{ background: "var(--paper)", color: "var(--ink)" }}
+                  />
+                  <label className="flex items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!q.describe}
+                      onChange={(e) => updateQuestion(q.id, { describe: e.target.checked })}
+                    />
+                    Add a "describe" follow-up when answered Yes
+                  </label>
+                </div>
+              ))}
+
+              <button onClick={addQuestion} className="w-full rounded-2xl py-3 text-base font-bold mb-3 transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "2px dashed var(--alert)" }}>
+                + Add an item
+              </button>
+
+              <button onClick={resetToTESI} className="w-full py-2 text-sm transition-colors hover:text-opacity-80" style={{ color: confirmReset ? "var(--alert)" : "var(--ink-soft)" }}>
+                {confirmReset ? "Tap again to restore TESI-PRR defaults" : "Restore TESI-PRR defaults"}
+              </button>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
+              <div className="max-w-md mx-auto">
+                <button
+                  onClick={startFill}
+                  disabled={askable.length === 0}
+                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
+                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+                >
+                  Begin interview · {askable.length} items
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── FILL MODE ───
+      if (mode === "fill" && current) {
+        const progress = ((idx + 1) / askable.length) * 100;
+        const value = answers[current.id];
+        return (
+          <div className="cib-body min-h-screen w-full flex flex-col animate-[cibFade_320ms_ease_both]" style={{ background: "var(--spruce-deep)", color: "var(--cream-on-dark)" }}>
+            <style>{FONT_CSS_TESI}</style>
+            <div className="max-w-md mx-auto w-full px-5 pt-6 pb-8 flex flex-col flex-1">
+              <div className="mb-8">
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{form.title}</span>
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>{idx + 1} of {askable.length}</span>
+                </div>
+                <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.12)" }}>
+                  <div className="h-1 rounded-full" style={{ width: progress + "%", background: "var(--alert)", transition: "width 300ms ease" }} />
+                </div>
+              </div>
+
+              <div key={current.id} className="cib-fade flex-1 flex flex-col">
+                {current.category ? <Eyebrow dark>{current.category}</Eyebrow> : null}
+                <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--cream-on-dark)" }}>
+                  {current.text}
+                </h1>
+
+                <div className="flex flex-col gap-3">
+                  {form.scale.map((label, i) => {
+                    const selected = value === i;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setAnswers({ ...answers, [current.id]: i })}
+                        className="w-full rounded-2xl py-4 px-5 text-left text-base font-bold transition-all active:scale-[0.99]"
+                        style={optionColor(i, selected)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {current.describe && value === 0 && (
+                  <div className="mt-5">
+                    <div className="text-sm mb-2" style={{ color: "var(--soft-on-dark)" }}>
+                      {current.describePrompt || "If yes, briefly describe:"}
+                    </div>
+                    <textarea
+                      value={typeof answers[current.id + "_desc"] === "string" ? answers[current.id + "_desc"] : ""}
+                      onChange={(e) => setAnswers({ ...answers, [current.id + "_desc"]: e.target.value })}
+                      placeholder="Brief description (optional)"
+                      rows={4}
+                      aria-label="Describe"
+                      className="w-full rounded-2xl p-4 text-base resize-none focus:outline-none"
+                      style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button onClick={back} className="rounded-2xl py-4 px-6 text-base font-bold transition-colors hover:bg-white/10" style={{ background: "rgba(255,255,255,0.07)", color: "var(--cream-on-dark)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                  Back
+                </button>
+                <button onClick={next} className="flex-1 rounded-2xl py-4 text-base font-bold transition-colors hover:bg-opacity-90" style={{ background: "var(--cream-on-dark)", color: "var(--spruce-deep)" }}>
+                  {idx + 1 >= askable.length ? "Finish" : "Next"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── DONE / RESULTS ───
+      const answeredCount = askable.filter((q) => answers[q.id] !== undefined).length;
+
+      return (
+        <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+          <style>{FONT_CSS_TESI}</style>
+          <div className="max-w-md mx-auto px-4 py-8 cib-fade">
+            <Eyebrow>All done</Eyebrow>
+            <h1 className="cib-display text-3xl mb-2" style={{ color: "var(--spruce)" }}>Thank you.</h1>
+            <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              {answeredCount} of {askable.length} items answered. Answers live only on this screen.
+              Copy them before you close or start over.
+            </p>
+
+            {/* Child & caregiver summary */}
+            <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+              <Eyebrow>Child & Caregiver</Eyebrow>
+              <div className="text-sm" style={{ color: "var(--ink-soft)" }}>
+                <p><strong style={{ color: "var(--spruce)" }}>{raterInfo.childName || "(no name)"}</strong></p>
+                <p>Informant: {raterInfo.caregiverName || "(not provided)"}</p>
+                <p>{raterInfo.date || new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+              <Eyebrow dark>Screening summary</Eyebrow>
+              <div className="flex justify-between items-baseline mb-2">
+                <span className="font-bold text-sm">Events endorsed (Yes)</span>
+                <span className="cib-display text-xl">
+                  {endorsedCount}
+                  <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}> / {askable.length}</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline mb-2">
+                <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>Unsure</span>
+                <span className="cib-display text-lg">{unsureCount}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-sm" style={{ color: "var(--soft-on-dark)" }}>No</span>
+                <span className="cib-display text-lg">{noCount}</span>
+              </div>
+              <p className="text-xs mt-3" style={{ color: "var(--soft-on-dark)" }}>
+                This is a count of endorsed events. The overall TESI-PRR score sums items meeting both
+                Criterion A and A-2 for PTSD (DSM-IV) — a determination that requires the full interview
+                and clinician judgment per the official manual.
+              </p>
+            </div>
+
+            <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
+              {askable.map((q, i) => {
+                const v = answers[q.id];
+                let a = "Skipped";
+                let aColor = "var(--spruce)";
+                if (v === 0) { a = "Yes"; aColor = "var(--alert)"; }
+                else if (v === 1) { a = "No"; }
+                else if (v === 2) { a = "Unsure"; aColor = "var(--ink-soft)"; }
+                const desc = answers[q.id + "_desc"];
+                return (
+                  <div key={q.id} className="py-3" style={i < askable.length - 1 ? { borderBottom: "1px solid var(--mist)" } : {}}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="text-sm" style={{ color: "var(--ink-soft)" }}>{i + 1}. {q.text}</div>
+                    </div>
+                    <div className="font-bold mt-1" style={{ color: aColor }}>{a}</div>
+                    {q.describe && typeof desc === "string" && desc.trim() && (
+                      <div className="text-sm mt-1 italic" style={{ color: "var(--ink-soft)" }}>“{desc.trim()}”</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button onClick={copySummary} className="w-full rounded-2xl py-4 text-lg font-bold mb-3 transition-colors hover:bg-opacity-90" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
+              {copied ? "Copied" : "Copy answers"}
+            </button>
+            <div className="flex gap-3">
+              <button onClick={startFill} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                New interview
+              </button>
+              <button onClick={() => setMode("build")} className="flex-1 rounded-2xl py-3 text-base font-bold transition-colors hover:bg-[#FAF8F5]" style={{ background: "var(--card)", color: "var(--spruce)", border: "1px solid var(--mist)" }}>
+                Back to builder
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Component 4: Portal Router / Selection Dashboard
+    // ─────────────────────────────────────────────────────────────
+    function App() {
+      const [assessment, setAssessment] = useState(null);
+
+      // Parse location hash for deep-linking routing
+      useEffect(() => {
+        const handleHash = () => {
+          const hash = window.location.hash;
+          if (hash === "#psi") {
+            setAssessment("psi");
+          } else if (hash === "#pkbs") {
+            setAssessment("pkbs");
+          } else if (hash === "#tesi") {
+            setAssessment("tesi");
+          } else {
+            setAssessment(null);
+          }
+        };
+        handleHash(); // Run on mount
+        window.addEventListener("hashchange", handleHash);
+        return () => window.removeEventListener("hashchange", handleHash);
+      }, []);
+
+      const selectAssessment = (type) => {
+        window.location.hash = type;
+      };
+
+      const clearAssessment = () => {
+        window.location.hash = "";
+      };
+
+      if (assessment === "psi") {
+        return <PSI4SFRecorder onBack={clearAssessment} />;
+      }
+
+      if (assessment === "pkbs") {
+        return <PKBS2Recorder onBack={clearAssessment} />;
+      }
+
+      if (assessment === "tesi") {
+        return <TESIPRRRecorder onBack={clearAssessment} />;
+      }
+
+      return (
+        <div className="cib-body min-h-screen w-full flex flex-col justify-between" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+
+          <div className="max-w-md mx-auto w-full px-5 py-12 flex flex-col items-center">
+
+            {/* Brand Header */}
+            <div className="text-center mb-10">
+              <h1 className="cib-display text-3xl font-bold tracking-tight mb-2 text-[#1F3A34]">
+                Assessment Recorders
+              </h1>
+              <p className="text-sm text-[#5C6E66]">
+                Phone-first digital response recorders and raw score calculators for clinicians.
+              </p>
+            </div>
+
+            {/* Selection Cards */}
+            <div className="w-full flex flex-col gap-5 mb-12">
+
+              {/* PSI-4-SF Card */}
+              <button
+                onClick={() => selectAssessment("psi")}
+                className="w-full text-left bg-white p-6 rounded-2xl border border-[#E4E9E2] hover:border-[#7FA08C] hover:shadow-md transition-all active:scale-[0.99] group"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#7FA08C]">
+                    Parenting Stress
+                  </span>
+                  <span className="text-xs font-medium text-[#5C6E66] bg-[#E4E9E2] px-2.5 py-1 rounded-full">
+                    36 Items
+                  </span>
+                </div>
+                <h2 className="cib-display text-xl font-bold text-[#1F3A34] mb-2 group-hover:text-[#7FA08C] transition-colors">
+                  PSI-4-SF Recorder
+                </h2>
+                <p className="text-sm text-[#5C6E66]">
+                  Record answers and compute raw subscale scores for Parent Distress, Dysfunctional Interaction, and Difficult Child.
+                </p>
+              </button>
+
+              {/* PKBS-2 Card */}
+              <button
+                onClick={() => selectAssessment("pkbs")}
+                className="w-full text-left bg-white p-6 rounded-2xl border border-[#E4E9E2] hover:border-[#7FA08C] hover:shadow-md transition-all active:scale-[0.99] group"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#9E4A5B]">
+                    Preschool &amp; Kindergarten
+                  </span>
+                  <span className="text-xs font-medium text-[#5C6E66] bg-[#E4E9E2] px-2.5 py-1 rounded-full">
+                    76 Items
+                  </span>
+                </div>
+                <h2 className="cib-display text-xl font-bold text-[#1F3A34] mb-2 group-hover:text-[#9E4A5B] transition-colors">
+                  PKBS-2 Recorder
+                </h2>
+                <p className="text-sm text-[#5C6E66]">
+                  Record observations of Social Skills (Cooperation, Interaction, Independence) and Problem Behaviors.
+                </p>
+              </button>
+
+              {/* TESI-PRR Card */}
+              <button
+                onClick={() => selectAssessment("tesi")}
+                className="w-full text-left bg-white p-6 rounded-2xl border border-[#E4E9E2] hover:border-[#B4552E] hover:shadow-md transition-all active:scale-[0.99] group"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#B4552E]">
+                    Trauma Screening
+                  </span>
+                  <span className="text-xs font-medium text-[#5C6E66] bg-[#E4E9E2] px-2.5 py-1 rounded-full">
+                    24 Items
+                  </span>
+                </div>
+                <h2 className="cib-display text-xl font-bold text-[#1F3A34] mb-2 group-hover:text-[#B4552E] transition-colors">
+                  TESI-PRR Recorder
+                </h2>
+                <p className="text-sm text-[#5C6E66]">
+                  Interviewer-administered Yes/No/Unsure screen of a child's history of exposure to potentially traumatic events.
+                </p>
+              </button>
+
+            </div>
+
+            {/* Footer info */}
+            <div className="text-center text-xs text-[#5C6E66] border-t border-[#E4E9E2] pt-6 w-full">
+              <p className="mb-4">
+                These tools are for digital recording convenience only. Scoring interpretation must be conducted by qualified professionals using official clinical manuals.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
