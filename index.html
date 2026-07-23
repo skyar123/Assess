@@ -928,7 +928,7 @@
         return (
           <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
             <style>{FONT_CSS_PSI}</style>
-            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+            <div className="max-w-md mx-auto px-4 pb-12 pt-8">
 
               {/* Back to Dashboard Banner */}
               <div className="flex justify-between items-center mb-6">
@@ -952,11 +952,20 @@
                 className="cib-body w-full bg-transparent text-sm mb-4 border-0"
                 style={{ color: "var(--ink-soft)" }}
               />
-              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              <p className="text-sm mb-4" style={{ color: "var(--ink-soft)" }}>
                 {askable.length} items loaded. Edit questions, scale labels, or categories below.
                 {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
                 {saveState === "off" && <span> Saving is off here.</span>}
               </p>
+
+              <button
+                onClick={startFill}
+                disabled={askable.length === 0}
+                className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg mb-6 transition-transform active:scale-[0.98]"
+                style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+              >
+                Hand it over · {askable.length} items
+              </button>
 
               {showDisclaimer && (
                 <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
@@ -1087,19 +1096,6 @@
                 {confirmReset ? "Tap again to restore PSI-4-SF defaults" : "Restore PSI-4-SF defaults"}
               </button>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
-              <div className="max-w-md mx-auto">
-                <button
-                  onClick={startFill}
-                  disabled={askable.length === 0}
-                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
-                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
-                >
-                  Hand it over · {askable.length} items
-                </button>
-              </div>
-            </div>
           </div>
         );
       }
@@ -1127,7 +1123,6 @@
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
                 <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
@@ -1568,7 +1563,7 @@
         return (
           <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
             <style>{FONT_CSS_PKBS}</style>
-            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+            <div className="max-w-md mx-auto px-4 pb-12 pt-8">
 
               {/* Back to Dashboard Banner */}
               <div className="flex justify-between items-center mb-6">
@@ -1592,11 +1587,20 @@
                 className="cib-body w-full bg-transparent text-sm mb-4 border-0"
                 style={{ color: "var(--ink-soft)" }}
               />
-              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              <p className="text-sm mb-4" style={{ color: "var(--ink-soft)" }}>
                 {socialSkillsCount} Social Skills items · {problemBehaviorCount} Problem Behavior items.
                 {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
                 {saveState === "off" && <span> Saving is off here.</span>}
               </p>
+
+              <button
+                onClick={startFill}
+                disabled={askable.length === 0}
+                className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg mb-6 transition-transform active:scale-[0.98]"
+                style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+              >
+                Hand it over · {askable.length} items
+              </button>
 
               {showDisclaimer && (
                 <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
@@ -1722,19 +1726,6 @@
                 {confirmReset ? "Tap again to restore PKBS-2 defaults" : "Restore PKBS-2 defaults"}
               </button>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
-              <div className="max-w-md mx-auto">
-                <button
-                  onClick={startFill}
-                  disabled={askable.length === 0}
-                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
-                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
-                >
-                  Hand it over · {askable.length} items
-                </button>
-              </div>
-            </div>
           </div>
         );
       }
@@ -1763,9 +1754,6 @@
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? (
-                  <Eyebrow dark>{current.category}</Eyebrow>
-                ) : null}
                 <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
@@ -2115,7 +2103,7 @@
         return (
           <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
             <style>{FONT_CSS_TESI}</style>
-            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+            <div className="max-w-md mx-auto px-4 pb-12 pt-8">
 
               {/* Back to Dashboard Banner */}
               <div className="flex justify-between items-center mb-6">
@@ -2139,11 +2127,20 @@
                 className="cib-body w-full bg-transparent text-sm mb-4 border-0"
                 style={{ color: "var(--ink-soft)" }}
               />
-              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              <p className="text-sm mb-4" style={{ color: "var(--ink-soft)" }}>
                 {askable.length} screening items. Yes / No / Unsure per item.
                 {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
                 {saveState === "off" && <span> Saving is off here.</span>}
               </p>
+
+              <button
+                onClick={startFill}
+                disabled={askable.length === 0}
+                className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg mb-6 transition-transform active:scale-[0.98]"
+                style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+              >
+                Begin interview · {askable.length} items
+              </button>
 
               {showDisclaimer && (
                 <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
@@ -2237,19 +2234,6 @@
                 {confirmReset ? "Tap again to restore TESI-PRR defaults" : "Restore TESI-PRR defaults"}
               </button>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
-              <div className="max-w-md mx-auto">
-                <button
-                  onClick={startFill}
-                  disabled={askable.length === 0}
-                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
-                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
-                >
-                  Begin interview · {askable.length} items
-                </button>
-              </div>
-            </div>
           </div>
         );
       }
@@ -2277,7 +2261,6 @@
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
                 <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
@@ -2693,7 +2676,7 @@
         return (
           <div className="cib-body min-h-screen w-full animate-[cibFade_320ms_ease_both]" style={{ background: "var(--paper)", color: "var(--ink)" }}>
             <style>{FONT_CSS_SSP}</style>
-            <div className="max-w-md mx-auto px-4 pb-32 pt-8">
+            <div className="max-w-md mx-auto px-4 pb-12 pt-8">
 
               {/* Back to Dashboard Banner */}
               <div className="flex justify-between items-center mb-6">
@@ -2717,11 +2700,20 @@
                 className="cib-body w-full bg-transparent text-sm mb-4 border-0"
                 style={{ color: "var(--ink-soft)" }}
               />
-              <p className="text-sm mb-6" style={{ color: "var(--ink-soft)" }}>
+              <p className="text-sm mb-4" style={{ color: "var(--ink-soft)" }}>
                 {askable.length} items across {existingCategories.length} sections.
                 {saveState === "saved" && <span style={{ color: "var(--moss)" }}> Saved.</span>}
                 {saveState === "off" && <span> Saving is off here.</span>}
               </p>
+
+              <button
+                onClick={startFill}
+                disabled={askable.length === 0}
+                className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg mb-6 transition-transform active:scale-[0.98]"
+                style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
+              >
+                Hand it over · {askable.length} items
+              </button>
 
               {showDisclaimer && (
                 <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
@@ -2846,19 +2838,6 @@
                 {confirmReset ? "Tap again to restore Short Sensory Profile defaults" : "Restore Short Sensory Profile defaults"}
               </button>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 px-4 py-4" style={{ background: "linear-gradient(transparent, var(--paper) 40%)" }}>
-              <div className="max-w-md mx-auto">
-                <button
-                  onClick={startFill}
-                  disabled={askable.length === 0}
-                  className="w-full rounded-2xl py-4 text-lg font-bold shadow-lg transition-transform active:scale-[0.98]"
-                  style={askable.length === 0 ? { background: "var(--mist)", color: "var(--ink-soft)" } : { background: "var(--spruce)", color: "var(--cream-on-dark)" }}
-                >
-                  Hand it over · {askable.length} items
-                </button>
-              </div>
-            </div>
           </div>
         );
       }
@@ -2886,7 +2865,6 @@
               </div>
 
               <div key={current.id} className="cib-fade flex-1 flex flex-col">
-                {current.category ? <Eyebrow>{current.category}</Eyebrow> : null}
                 <h1 className="cib-display text-2xl leading-snug mb-8" style={{ color: "var(--ink)" }}>
                   {current.text}
                 </h1>
