@@ -553,6 +553,131 @@
       doc.save(filename);
     }
 
+    // ─── Shared "data entry" export ───
+    // Produces the compact list a clinician types into the Child First
+    // data-entry program after finishing an assessment. The program shows
+    // "Item 1 … Item N" fields and accepts only numbers, so this view maps
+    // each item to the exact number to key in.
+    //
+    // Ordering matters: some instruments present items grouped by subscale
+    // (e.g. PKBS-2 shows Social Cooperation, then Interaction, …) while the
+    // Child First program numbers them by the instrument's *official* item
+    // order. Those official numbers are encoded in each question id
+    // (ss01…ss34 = Social Skills items 1–34, pb01…pb42 = Problem Behavior
+    // items 1–42, i01…i36 = PSI items 1–36). When `pageLabels` is supplied
+    // and every item's id prefix is known, we regroup and renumber by that
+    // official order so the printed "Item N" lines up with the program's
+    // "Item N". Otherwise we fall back to the on-screen order (which already
+    // matches for the PSI-4-SF and single-page instruments).
+    //
+    // `valueOf(q)` must return the number to type (or null if unanswered) —
+    // each recorder passes its own getScore, which already yields the
+    // program's coding (PSI-4-SF: SA=5…SD=1; PKBS-2: Never=0…Often=3).
+    function buildDataEntryGroups(form, valueOf, pageLabels) {
+      const askable = form.questions.filter((q) => q.text && q.text.trim().length > 0);
+      const parseId = (id) => {
+        const m = String(id).match(/^([A-Za-z]+)(\d+)$/);
+        return m ? { prefix: m[1], num: parseInt(m[2], 10) } : { prefix: "", num: null };
+      };
+      const usePages =
+        pageLabels &&
+        askable.length > 0 &&
+        askable.every((q) => {
+          const p = parseId(q.id);
+          return p.prefix && p.num !== null && pageLabels[p.prefix];
+        });
+
+      let groups;
+      if (usePages) {
+        const order = [];
+        const byPrefix = {};
+        askable.forEach((q) => {
+          const { prefix, num } = parseId(q.id);
+          if (!byPrefix[prefix]) { byPrefix[prefix] = []; order.push(prefix); }
+          byPrefix[prefix].push({ item: num, value: valueOf(q) });
+        });
+        groups = order.map((p) => ({
+          label: pageLabels[p],
+          rows: byPrefix[p].sort((a, b) => a.item - b.item),
+        }));
+      } else {
+        groups = [{
+          label: null,
+          rows: askable.map((q, i) => ({ item: i + 1, value: valueOf(q) })),
+        }];
+      }
+      // Drop pages that were never filled in (e.g. only one PKBS scale run).
+      return groups.filter((g) => g.rows.some((r) => r.value !== null && r.value !== undefined));
+    }
+
+    function dataEntryText(form, groups, dateStr) {
+      const fmt = (v) => (v === null || v === undefined ? "—" : String(v));
+      const lines = [(form.title || "Assessment") + " — data entry", dateStr, ""];
+      groups.forEach((g, gi) => {
+        if (g.label) {
+          if (gi > 0) lines.push("");
+          lines.push(g.label);
+        }
+        g.rows.forEach((r) => lines.push("Item " + r.item + ": " + fmt(r.value)));
+      });
+      return lines.join("\n");
+    }
+
+    // On-screen card that mirrors dataEntryText, with a one-tap copy button.
+    function DataEntryCard({ groups, dateStr, title }) {
+      const [copied, setCopied] = React.useState(false);
+      if (!groups || groups.length === 0) return null;
+      const fmt = (v) => (v === null || v === undefined ? "—" : String(v));
+      const copy = async () => {
+        const text = dataEntryText({ title }, groups, dateStr);
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch (e) {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            setCopied(true);
+          } catch (err) { setCopied(false); }
+        }
+        setTimeout(() => setCopied(false), 2000);
+      };
+      return (
+        <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "2px solid var(--moss)" }}>
+          <div className="flex justify-between items-center mb-1">
+            <div className="cib-body text-xs font-bold uppercase tracking-widest" style={{ color: "var(--moss)", letterSpacing: "0.14em" }}>
+              Data entry — type these into Child First
+            </div>
+            <button onClick={copy} className="text-xs font-bold rounded-full px-3 py-1 transition-colors hover:bg-opacity-90 flex-shrink-0" style={{ background: "var(--moss)", color: "var(--cream-on-dark)" }}>
+              {copied ? "Copied" : "Copy numbers"}
+            </button>
+          </div>
+          <p className="text-xs mb-3" style={{ color: "var(--ink-soft)" }}>
+            Item numbers match the program's fields. Read straight down and key in each number.
+          </p>
+          {groups.map((g, gi) => (
+            <div key={gi} className={gi > 0 ? "mt-3" : ""}>
+              {g.label && (
+                <div className="text-xs font-bold mb-1" style={{ color: "var(--spruce)" }}>{g.label}</div>
+              )}
+              <div className="grid grid-cols-2 gap-x-4" style={{ fontFamily: "monospace" }}>
+                {g.rows.map((r) => (
+                  <div key={r.item} className="flex justify-between items-baseline py-0.5 text-sm" style={{ borderBottom: "1px solid var(--mist)" }}>
+                    <span style={{ color: "var(--ink-soft)" }}>Item {r.item}</span>
+                    <span className="font-bold" style={{ color: r.value === null || r.value === undefined ? "var(--ink-soft)" : "var(--spruce)" }}>{fmt(r.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Component 1: PSI-4-SF Response Recorder
     // ─────────────────────────────────────────────────────────────
@@ -722,8 +847,14 @@
       };
 
       // ─── results helpers ───
+      // PSI items are shown in official order (i01…i36), so on-screen order
+      // already matches the Child First program's Item 1…36 — no page map.
+      const dataEntryGroups = () => buildDataEntryGroups(form, getScore, null);
+
       const summaryText = () => {
-        const lines = [form.title, new Date().toLocaleDateString(), ""];
+        const dateStr = new Date().toLocaleDateString();
+        const lines = [dataEntryText(form, dataEntryGroups(), dateStr), "", "─────", ""];
+        lines.push(form.title, dateStr, "");
         askable.forEach((q, i) => {
           const score = getScore(q);
           let a = "(skipped)";
@@ -1097,6 +1228,8 @@
               Copy them before you close or start over.
             </p>
 
+            <DataEntryCard groups={dataEntryGroups()} dateStr={new Date().toLocaleDateString()} title={form.title} />
+
             {totalKeys.length > 0 && (
               <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--spruce)", color: "var(--cream-on-dark)" }}>
                 <Eyebrow dark>Raw subscale totals</Eyebrow>
@@ -1344,10 +1477,22 @@
       };
 
       // ─── results helpers ───
+      // The PKBS is presented grouped by subscale, but the Child First
+      // program numbers Social Skills 1–34 and Problem Behavior 1–42 in the
+      // instrument's official order — which is encoded in the ids (ss.. / pb..).
+      // Regroup and renumber by that order so "Item N" here matches the program.
+      const PKBS_PAGE_LABELS = { ss: "Page 1 — Social Skills (Items 1–34)", pb: "Page 2 — Problem Behavior (Items 1–42)" };
+      const dataEntryGroups = () => buildDataEntryGroups(form, getScore, PKBS_PAGE_LABELS);
+
       const summaryText = () => {
+        const dateStr = raterInfo.date || new Date().toLocaleDateString();
         const lines = [
+          dataEntryText(form, dataEntryGroups(), dateStr),
+          "",
+          "─────",
+          "",
           form.title + " — " + form.subtitle,
-          "Date: " + (raterInfo.date || new Date().toLocaleDateString()),
+          "Date: " + dateStr,
           "Child: " + (raterInfo.childName || "(not provided)"),
           "Age: " + (raterInfo.ageYears || "?") + "y " + (raterInfo.ageMonths || "?") + "m  |  Sex: " + (raterInfo.sex || "?"),
           "Rated by: " + (raterInfo.ratedBy || "(not provided)") + " (" + (raterInfo.relationship || "?") + ")",
@@ -1702,6 +1847,8 @@
               {answeredCount} of {askable.length} items answered. Answers live only on this screen.
               Copy them before you close or start over.
             </p>
+
+            <DataEntryCard groups={dataEntryGroups()} dateStr={raterInfo.date || new Date().toLocaleDateString()} title={form.title} />
 
             {/* Rater info summary */}
             <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--card)", border: "1px solid var(--mist)" }}>
