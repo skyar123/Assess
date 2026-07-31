@@ -6,12 +6,6 @@
   publish = "."
   command = ""
 
-# Redirect rules for SPA routing (if needed in future)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
 # Cache control headers
 [[headers]]
   for = "/"
